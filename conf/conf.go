@@ -2,15 +2,10 @@ package conf
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
-
-var conf *viper.Viper
-
-func GetConfig() *viper.Viper {
-	return conf
-}
 
 func LoadConfig() {
 	log.Debug("Reading config file")
@@ -24,12 +19,11 @@ func LoadConfig() {
 		log.Panic(fmt.Errorf("Fatal error config file: %s \n", err))
 	}
 
-	conf = viper.GetViper()
 	setLoggerLevel()
 }
 
 func setLoggerLevel() {
-	switch conf.GetString("log_level") {
+	switch viper.GetString("log_level") {
 	case "debug":
 		log.SetLevel(log.DebugLevel)
 	case "info":

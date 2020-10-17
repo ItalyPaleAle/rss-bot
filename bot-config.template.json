@@ -7,5 +7,6 @@
   "feed_parse_amount": FEED_PARSE_AMOUNT,
   "feed_post_amount": FEED_POST_AMOUNT,
   "feed_updates_interval": FEED_UPDATES_INTERVAL,
-  "feed_posts_interval": FEED_POST_INTERVAL
+  "feed_posts_interval": FEED_POST_INTERVAL,
+  "allowed_users": []
 }

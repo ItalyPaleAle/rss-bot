@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 // Basic Feed Data Model for the Feed Items which we get from the Feed
 type FeedData struct {

@@ -3,26 +3,21 @@ package feeds
 import (
 	"database/sql"
 	"errors"
-	"github.com/0x111/telegram-rss-bot/conf"
+	"time"
+
 	"github.com/0x111/telegram-rss-bot/db"
 	"github.com/0x111/telegram-rss-bot/models"
 	"github.com/0x111/telegram-rss-bot/replies"
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+
+	tgbotapi "github.com/dilfish/telegram-bot-api-up"
 	"github.com/mmcdole/gofeed"
 	log "github.com/sirupsen/logrus"
-	"time"
+	"github.com/spf13/viper"
 )
 
-// Add a new feed to the database
+// AddFeed adds a new feed to the database
 func AddFeed(Bot *tgbotapi.BotAPI, name string, url string, chatid int64, userid int) error {
 	DB := db.GetDB()
-	exists, err := Exists(url, chatid)
-
-	if err != nil {
-		log.WithFields(log.Fields{"error": err}).Error("There was an error while querying the database!")
-		replies.SimpleMessage(Bot, chatid, 0, "There was an error while adding your feed\\! Please try again\\!")
-		return err
-	}
 
 	// Check if user is providing a valid feed URL
 	if err := isValidFeed(url); err != nil {
@@ -31,22 +26,27 @@ func AddFeed(Bot *tgbotapi.BotAPI, name string, url string, chatid int64, userid
 		return errors.New("invalid_feed_url")
 	}
 
+	// Check if the URL exists already
+	exists, err := Exists(url, chatid)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err}).Error("There was an error while querying the database!")
+		replies.SimpleMessage(Bot, chatid, 0, "There was an error while adding your feed\\! Please try again\\!")
+		return err
+	}
 	if exists {
 		log.WithFields(log.Fields{"exists": exists}).Debug("Feed exists!")
 		replies.SimpleMessage(Bot, chatid, 0, "The feed you are trying to add already exists\\!")
 		return errors.New("feed_exists")
 	}
 
+	// Add the feed
 	stmt, err := DB.Prepare("INSERT INTO feeds(name, url, chatid, userid) VALUES(?,?,?,?)")
 	defer stmt.Close()
-
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("There was an error while preparing the query!")
 		return err
 	}
-
 	_, err = stmt.Exec(name, url, chatid, userid)
-
 	if err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("There was an error while executing the query!")
 		return err
@@ -57,7 +57,7 @@ func AddFeed(Bot *tgbotapi.BotAPI, name string, url string, chatid int64, userid
 	return nil
 }
 
-// Delete a feed by a feedID parameter
+// DeleteFeedByID deletes a feed by a feedID parameter
 func DeleteFeedByID(feedid int, chatid int64, userid int) error {
 	if err := FeedExistsByID(feedid, chatid, userid); err != nil {
 		return err
@@ -65,6 +65,7 @@ func DeleteFeedByID(feedid int, chatid int64, userid int) error {
 
 	DB := db.GetDB()
 
+	// Delete the feed
 	stmt, err := DB.Prepare("DELETE FROM feeds WHERE id=? AND userid=? AND chatid=?")
 
 	if err != nil {
@@ -82,7 +83,7 @@ func DeleteFeedByID(feedid int, chatid int64, userid int) error {
 	return nil
 }
 
-// Get a list of all Feeds added to the database
+// ListAllFeeds returns a list of all Feeds added to the database
 func ListAllFeeds() (*[]models.Feed, error) {
 	DB := db.GetDB()
 	rows, err := DB.Query("SELECT id, name, url, userid, chatid FROM feeds")
@@ -116,7 +117,7 @@ func ListAllFeeds() (*[]models.Feed, error) {
 	return &feed, nil
 }
 
-// List all feeds added to the database, filter by userID and chatID
+// ListFeeds lists all feeds added to the database, filter by userID and chatID
 func ListFeeds(userid int, chatid int64) (*[]models.Feed, error) {
 	DB := db.GetDB()
 	rows, err := DB.Query("SELECT id, name, url FROM feeds WHERE userid=? AND chatid=?", userid, chatid)
@@ -147,12 +148,11 @@ func ListFeeds(userid int, chatid int64) (*[]models.Feed, error) {
 	return &feed, nil
 }
 
-// Get all unpublished feed data from the database, this will contain all feeds
+// GetAllUnPublishedFeedData returns all unpublished feed data from the database, this will contain all feeds
 // which were not yet posted to the specific channels
 func GetAllUnPublishedFeedData() (*[]models.FeedData, error) {
 	DB := db.GetDB()
-	config := conf.GetConfig()
-	rows, err := DB.Query("SELECT feedData.id, feedData.feedid, feedData.title, feedData.link, feedData.published, feedData.publishedDate, feeds.name, feeds.chatid FROM feedData INNER JOIN feeds on feedData.feedid = feeds.id WHERE feedData.published=? ORDER BY feedData.id ASC LIMIT ?", false, config.GetInt("feed_post_amount"))
+	rows, err := DB.Query("SELECT feedData.id, feedData.feedid, feedData.title, feedData.link, feedData.published, feedData.publishedDate, feeds.name, feeds.chatid FROM feedData INNER JOIN feeds on feedData.feedid = feeds.id WHERE feedData.published=? ORDER BY feedData.id ASC LIMIT ?", false, viper.GetInt("feed_post_amount"))
 	defer rows.Close()
 
 	if err != nil {
@@ -181,7 +181,7 @@ func GetAllUnPublishedFeedData() (*[]models.FeedData, error) {
 	return &feedData, nil
 }
 
-// Check for a feed if it exists by its url
+// Exists checks for a feed if it exists by its url
 // returns true if exists and false if it does not
 func Exists(url string, chatid int64) (bool, error) {
 	DB := db.GetDB()
@@ -212,6 +212,7 @@ func Exists(url string, chatid int64) (bool, error) {
 	return true, nil
 }
 
+// FeedExistsByID returns true if a feed exists by ID
 func FeedExistsByID(id int, chatid int64, userid int) error {
 	DB := db.GetDB()
 	feed := models.Feed{}
@@ -230,8 +231,7 @@ func FeedExistsByID(id int, chatid int64, userid int) error {
 // Here we send all the feed data to the channel
 func GetFeedUpdatesChan() chan models.Feed {
 	ch := make(chan models.Feed)
-	config := conf.GetConfig()
-	ticker := time.NewTicker(config.GetDuration("feed_updates_interval") * time.Second)
+	ticker := time.NewTicker(viper.GetDuration("feed_updates_interval") * time.Second)
 	log.Info("Getting feed updates")
 
 	go func() {
@@ -264,9 +264,8 @@ func GetFeedUpdatesChan() chan models.Feed {
 // This channel is use for getting all the unpublished feed data from the database
 // We write all the unpublished feed data into the channel
 func PostFeedUpdatesChan() chan models.FeedData {
-	config := conf.GetConfig()
 	ch := make(chan models.FeedData)
-	ticker := time.NewTicker(config.GetDuration("feed_posts_interval") * time.Second)
+	ticker := time.NewTicker(viper.GetDuration("feed_posts_interval") * time.Second)
 	go func() {
 		for {
 			select {
@@ -294,7 +293,6 @@ func PostFeedUpdatesChan() chan models.FeedData {
 
 // This function requests the RSS Feed, parses and processes the data
 func GetFeed(feedUrl string, feedID int) error {
-	config := conf.GetConfig()
 	fp := gofeed.NewParser()
 	feed, err := fp.ParseURL(feedUrl)
 
@@ -305,8 +303,8 @@ func GetFeed(feedUrl string, feedID int) error {
 	}
 
 	for index, feedItem := range feed.Items {
-		if index > config.GetInt("feed_parse_amount") {
-			log.WithFields(log.Fields{"feed_parse_amount": config.GetInt("feed_parse_amount")}).Debug("The amount of feeds to save has been reached, do not parse further!")
+		if index > viper.GetInt("feed_parse_amount") {
+			log.WithFields(log.Fields{"feed_parse_amount": viper.GetInt("feed_parse_amount")}).Debug("The amount of feeds to save has been reached, do not parse further!")
 			continue
 		}
 

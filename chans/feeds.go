@@ -2,9 +2,11 @@ package chans
 
 import (
 	"fmt"
+
 	"github.com/0x111/telegram-rss-bot/feeds"
 	"github.com/0x111/telegram-rss-bot/replies"
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+
+	tgbotapi "github.com/dilfish/telegram-bot-api-up"
 	log "github.com/sirupsen/logrus"
 )
 

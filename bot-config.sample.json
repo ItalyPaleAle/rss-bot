@@ -7,5 +7,6 @@
   "feed_parse_amount": 5,
   "feed_post_amount": 2,
   "feed_updates_interval": 600,
-  "feed_posts_interval": 400
+  "feed_posts_interval": 400,
+  "allowed_users": [12345]
 }
