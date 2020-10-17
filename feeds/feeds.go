@@ -5,14 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
-	"github.com/0x111/telegram-rss-bot/db"
-	"github.com/0x111/telegram-rss-bot/models"
+	"github.com/Songmu/go-httpdate"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/mmcdole/gofeed"
+	"github.com/0x111/telegram-rss-bot/db"
+	"github.com/0x111/telegram-rss-bot/models"
 )
 
 // Post represents a post in the feed
@@ -29,6 +30,9 @@ type UpdateMessage struct {
 	ChatId int64
 }
 
+// Timeout for HTTP requests
+const requestTimeout = 20 * time.Second
+
 // Error returned when we're already subscribed
 var ErrAlreadySubscribed = errors.New("already_subscribed")
 
@@ -39,6 +43,7 @@ type Feeds struct {
 	semaphore chan int
 	waiting   chan int
 	updateCh  chan<- UpdateMessage
+	client    *http.Client
 }
 
 // Init the object
@@ -46,11 +51,16 @@ func (f *Feeds) Init(ctx context.Context) (err error) {
 	f.ctx = ctx
 
 	// Init the logger
-	f.log = log.New(os.Stdout, "feeds", log.Ldate|log.Ltime|log.LUTC)
+	f.log = log.New(os.Stdout, "feeds: ", log.Ldate|log.Ltime|log.LUTC)
 
 	// Init the update semaphore and waiting channels
 	f.semaphore = make(chan int, 1)
 	f.waiting = make(chan int, 1)
+
+	// Init the HTTP client
+	f.client = &http.Client{
+		Timeout: requestTimeout,
+	}
 
 	return nil
 }
@@ -225,40 +235,41 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 	}
 
 	// Get the feed to both validate it and to get the latest entry
-	fp := gofeed.NewParser()
 	f.log.Println("Fetching feed", url)
-	posts, err := fp.ParseURL(url)
+	feed := &models.Feed{
+		Url: url,
+	}
+	posts, err := f.RequestFeed(feed)
 	if err != nil {
 		f.log.Println("Error while fetching the feed:", err)
 		return nil, err
 	}
 
 	// Get the most recent, valid entry
-	feed := &models.Feed{
-		Url: url,
-	}
-	for _, el := range posts.Items {
-		// Skip items with an invalid date
-		parsePubDate, err := time.Parse(time.RFC1123Z, el.Published)
-		if err != nil {
-			f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", url, el.Published, err)
-			continue
-		}
-		if el.Title == "" {
-			f.log.Printf("Error in feed %s: skipping entry with empty title\n", url)
-			continue
-		}
+	if posts != nil && posts.Items != nil {
+		for _, el := range posts.Items {
+			// Skip items with an invalid date
+			parsePubDate, err := httpdate.Str2Time(el.Published, nil)
+			if err != nil {
+				f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", url, el.Published, err)
+				continue
+			}
+			if el.Title == "" {
+				f.log.Printf("Error in feed %s: skipping entry with empty title\n", url)
+				continue
+			}
 
-		// Check if this is newer than the one stored
-		if parsePubDate.After(feed.LastPostDate) {
-			feed.LastPostTitle = el.Title
-			feed.LastPostLink = el.Link
-			feed.LastPostDate = parsePubDate
+			// Check if this is newer than the one stored
+			if parsePubDate.After(feed.LastPostDate) {
+				feed.LastPostTitle = el.Title
+				feed.LastPostLink = el.Link
+				feed.LastPostDate = parsePubDate
+			}
 		}
 	}
 
 	// Add the feed to the database
-	res, err := querier.Exec("INSERT INTO feeds (feed_url, feed_last_post_title, feed_last_post_link, feed_last_post_date) VALUES (?, ?, ?, ?)", feed.Url, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate)
+	res, err := querier.Exec("INSERT INTO feeds (feed_url, feed_last_modified, feed_etag, feed_last_post_title, feed_last_post_link, feed_last_post_date) VALUES (?, ?, ?, ?, ?, ?)", feed.Url, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate)
 	if err != nil {
 		f.log.Println("Error querying the database:", err)
 		return nil, err

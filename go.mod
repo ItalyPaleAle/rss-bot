@@ -3,6 +3,7 @@ module github.com/0x111/telegram-rss-bot
 go 1.15
 
 require (
+	github.com/Songmu/go-httpdate v1.0.0
 	github.com/dilfish/telegram-bot-api-up v1.0.1
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.4

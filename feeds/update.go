@@ -1,11 +1,10 @@
 package feeds
 
 import (
-	"time"
+	"github.com/Songmu/go-httpdate"
 
 	"github.com/0x111/telegram-rss-bot/db"
 	"github.com/0x111/telegram-rss-bot/models"
-	"github.com/mmcdole/gofeed"
 )
 
 // SetUpdateChan sets the channel to use for notify the bot of new messages for subscribers
@@ -93,43 +92,44 @@ func (f *Feeds) updateFeeds() error {
 // If there are new posts, the feed object is updated too as a side effect
 func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 	// Request the data
-	fp := gofeed.NewParser()
 	f.log.Printf("Updating feed %d (%s)\n", feed.ID, feed.Url)
-	posts, err := fp.ParseURL(feed.Url)
+	posts, err := f.RequestFeed(feed)
 	if err != nil {
 		f.log.Println("Error while fetching the feed:", err)
 		return nil, err
 	}
 
-	// Get all new entries, up to feed_parse_amount
+	// Get all new entries
 	res := make([]Post, 0)
-	after := feed.LastPostDate
-	for _, el := range posts.Items {
-		// Skip items with an invalid date
-		parsePubDate, err := time.Parse(time.RFC1123Z, el.Published)
-		if err != nil {
-			f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", feed.Url, el.Published, err)
-			continue
-		}
-		if el.Title == "" {
-			f.log.Printf("Error in feed %s: skipping entry with empty title\n", feed.Url)
-			continue
-		}
+	if posts != nil && posts.Items != nil {
+		after := feed.LastPostDate
+		for _, el := range posts.Items {
+			// Skip items with an invalid date
+			parsePubDate, err := httpdate.Str2Time(el.Published, nil)
+			if err != nil {
+				f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", feed.Url, el.Published, err)
+				continue
+			}
+			if el.Title == "" {
+				f.log.Printf("Error in feed %s: skipping entry with empty title\n", feed.Url)
+				continue
+			}
 
-		// Check if this is a new post
-		if parsePubDate.After(after) {
-			// Add it to the result
-			res = append(res, Post{
-				Title: el.Title,
-				Link:  el.Link,
-				Date:  parsePubDate,
-			})
+			// Check if this is a new post
+			if parsePubDate.After(after) {
+				// Add it to the result
+				res = append(res, Post{
+					Title: el.Title,
+					Link:  el.Link,
+					Date:  parsePubDate,
+				})
 
-			// Look for the most recent post for updating the feed object
-			if parsePubDate.After(feed.LastPostDate) {
-				feed.LastPostTitle = el.Title
-				feed.LastPostLink = el.Link
-				feed.LastPostDate = parsePubDate
+				// Look for the most recent post for updating the feed object
+				if parsePubDate.After(feed.LastPostDate) {
+					feed.LastPostTitle = el.Title
+					feed.LastPostLink = el.Link
+					feed.LastPostDate = parsePubDate
+				}
 			}
 		}
 	}
@@ -144,7 +144,7 @@ func (f *Feeds) setLastPost(feed *models.Feed) {
 
 	// Note that we're not using a transaction here (because the update process can take a while), but there's only one of these methods that can be running at the same time
 	// The bot can be deleting the feed in the meanwhile, but this would just make the next query fail (and that's why we're ignoring the error here)
-	_, err := db.GetDB().Exec("UPDATE feeds SET feed_last_post_title = ?, feed_last_post_link = ?, feed_last_post_date = ? WHERE feed_id = ?", feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.ID)
+	_, err := db.GetDB().Exec("UPDATE feeds SET feed_last_modified = ?, feed_etag = ?, feed_last_post_title = ?, feed_last_post_link = ?, feed_last_post_date = ? WHERE feed_id = ?", feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.ID)
 	if err != nil {
 		f.log.Printf("Error while updating the last post for feed %s (id: %d), but continuing to next. Error: %s\n", feed.Url, feed.ID, err)
 	}

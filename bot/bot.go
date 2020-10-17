@@ -25,7 +25,7 @@ type RSSBot struct {
 // Init the object
 func (b *RSSBot) Init() (err error) {
 	// Init the logger
-	b.log = log.New(os.Stdout, "rss-bot", log.Ldate|log.Ltime|log.LUTC)
+	b.log = log.New(os.Stdout, "rss-bot: ", log.Ldate|log.Ltime|log.LUTC)
 
 	// Get the auth key
 	// "token" is the default value in the config file

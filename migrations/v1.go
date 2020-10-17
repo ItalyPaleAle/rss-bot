@@ -12,6 +12,8 @@ func V1() error {
 CREATE TABLE IF NOT EXISTS feeds (
 	feed_id integer primary key autoincrement,
 	feed_url text not null,
+	feed_last_modified timestamp not null,
+	feed_etag text not null,
 	feed_last_post_title text not null,
 	feed_last_post_link text not null,
 	feed_last_post_date timestamp not null
