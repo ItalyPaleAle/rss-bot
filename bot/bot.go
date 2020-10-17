@@ -105,7 +105,10 @@ func (b *RSSBot) backgroundWorker() {
 
 		// Send messages on new posts
 		case msg := <-msgCh:
-			b.bot.Send(tb.ChatID(msg.ChatId), b.formatUpateMessage(&msg))
+			_, err := b.bot.Send(tb.ChatID(msg.ChatId), b.formatUpateMessage(&msg))
+			if err != nil {
+				b.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())
+			}
 
 		// Context canceled
 		case <-b.ctx.Done():
