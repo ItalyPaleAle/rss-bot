@@ -1,25 +1,24 @@
 package db
 
 import (
-	"database/sql"
-
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 var (
-	db *sql.DB
+	db *sqlx.DB
 )
 
-func GetDB() *sql.DB {
+func GetDB() *sqlx.DB {
 	return db
 }
 
-func ConnectDB() *sql.DB {
+func ConnectDB() *sqlx.DB {
 	var err error
 	log.Debug("Connecting to the database")
-	db, err = sql.Open("sqlite3", "file:"+viper.GetString("db_path")+"?cache=shared")
+	db, err = sqlx.Open("sqlite3", "file:"+viper.GetString("db_path")+"?cache=shared")
 
 	// Check error for database connection
 	if err != nil {

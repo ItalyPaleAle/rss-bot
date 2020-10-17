@@ -7,7 +7,7 @@ import (
 func Migrate() {
 	// This is as bad as it seems, but it looked weird to use some complex tool for something as simple
 	// as creating a few tables for this small app.
-	_, err := V1()
+	err := V1()
 
 	log.Debug("Running Migrations")
 
