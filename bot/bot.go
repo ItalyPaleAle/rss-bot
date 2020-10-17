@@ -61,7 +61,10 @@ func (b *RSSBot) Start() error {
 	}
 
 	// Register the command handlers
-	b.registerCommands()
+	err = b.registerCommands()
+	if err != nil {
+		return err
+	}
 
 	// Start the background worker
 	go b.backgroundWorker()
@@ -125,18 +128,35 @@ func (b *RSSBot) formatUpateMessage(msg *feeds.UpdateMessage) string {
 // Sends a response to a command
 // For commands sent in private chats, this just sends a regular message
 // In groups, this replies to a specific message
-func (b *RSSBot) respondToCommand(m *tb.Message, msg string) (err error) {
+func (b *RSSBot) respondToCommand(m *tb.Message, msg string) (out *tb.Message, err error) {
+	// If it's a private chat, send a message, otherwise reply
 	if m.Private() {
-		_, err = b.bot.Send(m.Sender, msg)
+		out, err = b.bot.Send(m.Sender, msg)
 	} else {
-		_, err = b.bot.Reply(m, msg)
+		out, err = b.bot.Reply(m, msg)
 	}
+
+	// Log errors
+	if err != nil {
+		b.log.Printf("Error sending message to chat %d: %s\n", m.Chat.ID, err.Error())
+	}
+
 	return
 }
 
 // Register all command handlers
-func (b *RSSBot) registerCommands() {
+func (b *RSSBot) registerCommands() (err error) {
+	// Register handlers
 	b.bot.Handle("/start", b.handleStart)
 	b.bot.Handle("/help", b.handleHelp)
 	b.bot.Handle("/add", b.handleAdd)
+	b.bot.Handle("/list", b.handleList)
+
+	// Set commands for Telegram
+	err = b.bot.SetCommands([]tb.Command{
+		{Text: "add", Description: "Subscribe to a new feed"},
+		{Text: "list", Description: "List subscriptions for this chat"},
+		{Text: "help", Description: "Show help message"},
+	})
+	return err
 }

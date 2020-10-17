@@ -188,7 +188,7 @@ func (f *Feeds) ListSubscriptions(chatId int64) ([]models.Feed, error) {
 
 	// Query the DB
 	rows := []models.Feed{}
-	err := DB.Select(&rows, "SELECT feeds.* FROM feeds, subscriptions WHERE chat_id = ? AND feeds.feed_id = subscriptions.feed_id", chatId)
+	err := DB.Select(&rows, "SELECT feeds.* FROM feeds, subscriptions WHERE chat_id = ? AND feeds.feed_id = subscriptions.feed_id ORDER BY feed_url ASC", chatId)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// No rows

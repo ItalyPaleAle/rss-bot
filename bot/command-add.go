@@ -21,19 +21,22 @@ func (b *RSSBot) handleAdd(m *tb.Message) {
 		return
 	}
 
+	// Send a message that we're working on it
+	wm, _ := b.respondToCommand(m, "Working on it…")
+
 	// Add the subscription
 	post, err := b.feeds.AddSubscription(url, m.Chat.ID)
 	if err != nil {
 		if err == feeds.ErrAlreadySubscribed {
-			b.respondToCommand(m, "This chat is already subscribed to the feed")
+			b.bot.Edit(wm, "This chat is already subscribed to the feed")
 		} else {
-			b.respondToCommand(m, "An internal error occurred")
+			b.bot.Edit(wm, "An internal error occurred")
 		}
 		return
 	}
 
-	b.respondToCommand(m, fmt.Sprintf("The feed with URL %s wa successfully added to this channel. Here is the last post published:", url))
-	b.respondToCommand(m, b.formatUpateMessage(&feeds.UpdateMessage{
+	b.bot.Edit(wm, fmt.Sprintf("The feed with URL %s was successfully added to this channel. Here is the last post published:", url))
+	b.bot.Send(m.Sender, b.formatUpateMessage(&feeds.UpdateMessage{
 		Post: *post,
 	}))
 }
