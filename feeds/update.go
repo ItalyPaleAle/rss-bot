@@ -75,8 +75,9 @@ func (f *Feeds) updateFeeds() error {
 	f.log.Println("Started updating feeds")
 
 	// Start background workers to parallelize requests
-	jobs := make(chan *models.Feed)
-	results := make(chan workerResult)
+	// Channels' buffer is 4x the number of workers
+	jobs := make(chan *models.Feed, (parallelFetch * 4))
+	results := make(chan workerResult, (parallelFetch * 4))
 	for i := 1; i <= parallelFetch; i++ {
 		go f.updateWorker(i, jobs, results)
 	}
