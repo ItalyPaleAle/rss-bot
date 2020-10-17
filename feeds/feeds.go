@@ -148,7 +148,7 @@ func (f *Feeds) DeleteSubscription(feedId int64, chatId int64) error {
 	defer tx.Rollback()
 
 	// Delete the subscription
-	_, err = tx.Exec("DELETE FROM subscriptions WHERE feed_id = ? AND chat_id = ? LIMIT 1", feedId, chatId)
+	_, err = tx.Exec("DELETE FROM subscriptions WHERE feed_id = ? AND chat_id = ?", feedId, chatId)
 	if err != nil {
 		f.log.Println("Error querying the database:", err)
 		return err
@@ -156,11 +156,11 @@ func (f *Feeds) DeleteSubscription(feedId int64, chatId int64) error {
 
 	// Check if there are other subscriptions for this feed
 	subscription := &models.Subscription{}
-	err = tx.Get(subscription, "SELECT subscription_id FROM subscriptions WHERE feed_id = ? LIMIT 1", feedId)
+	err = tx.Get(subscription, "SELECT subscription_id FROM subscriptions WHERE feed_id = ?", feedId)
 	if err != nil {
 		// If there are no more rows, delete the feed
 		if err == sql.ErrNoRows {
-			_, err = tx.Exec("DELETE FROM feeds WHERE feed_id = ? LIMIT 1", feedId)
+			_, err = tx.Exec("DELETE FROM feeds WHERE feed_id = ?", feedId)
 			if err != nil {
 				f.log.Println("Error querying the database:", err)
 				return err
