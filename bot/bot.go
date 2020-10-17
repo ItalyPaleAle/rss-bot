@@ -35,11 +35,43 @@ func (b *RSSBot) Init() (err error) {
 		return errors.New("Telegram auth key not set")
 	}
 
+	// Poller
+	var poller tb.Poller = &tb.LongPoller{Timeout: 10 * time.Second}
+
+	// Check if we're restricting the bot to certain users only
+	var allowedUsers map[int]bool
+	if uids := viper.GetIntSlice("allowed_users"); len(uids) > 0 {
+		// Create a map so lookups are faster
+		allowedUsers = make(map[int]bool, len(uids))
+		for i := 0; i < len(uids); i++ {
+			allowedUsers[uids[i]] = true
+		}
+
+		// Create a middleware
+		poller = tb.NewMiddlewarePoller(poller, func(u *tb.Update) bool {
+			if u.Message == nil {
+				return true
+			}
+
+			// Restrict to certain users only
+			if u.Message.Sender == nil || u.Message.Sender.ID == 0 || !allowedUsers[u.Message.Sender.ID] {
+				if u.Message.Sender == nil {
+					b.log.Printf("Ignoring message from empty sender")
+				} else {
+					b.log.Printf("Ignoring message from un-allowed sender:", u.Message.Sender.ID)
+				}
+				return false
+			}
+
+			return true
+		})
+	}
+
 	// Create the bot object
 	// TODO: Enable support for webhook: https://godoc.org/gopkg.in/tucnak/telebot.v2#Webhook
 	b.bot, err = tb.NewBot(tb.Settings{
 		Token:   authKey,
-		Poller:  &tb.LongPoller{Timeout: 10 * time.Second},
+		Poller:  poller,
 		Verbose: viper.GetBool("telegram_api_debug"),
 	})
 	if err != nil {
