@@ -1,15 +1,18 @@
 package main
 
 import (
-	"github.com/0x111/telegram-rss-bot/bot"
-	"github.com/0x111/telegram-rss-bot/conf"
-	"github.com/0x111/telegram-rss-bot/db"
-	"github.com/0x111/telegram-rss-bot/migrations"
+	"fmt"
+
+	"github.com/spf13/viper"
+
+	"github.com/ItalyPaleAle/rss-bot/bot"
+	"github.com/ItalyPaleAle/rss-bot/db"
+	"github.com/ItalyPaleAle/rss-bot/migrations"
 )
 
 func main() {
 	// Load config
-	conf.LoadConfig()
+	loadConfig()
 
 	// Connect to DB and migrate to the latest version
 	dbc := db.ConnectDB()
@@ -27,5 +30,16 @@ func main() {
 	err = b.Start()
 	if err != nil {
 		panic(err)
+	}
+}
+
+func loadConfig() {
+	viper.SetConfigName("bot-config")
+	viper.AddConfigPath("$HOME/.telegram-rss-bot")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("./.telegram-rss-bot")
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(fmt.Sprintf("Fatal error config file: %s\n", err))
 	}
 }

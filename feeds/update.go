@@ -3,8 +3,8 @@ package feeds
 import (
 	"github.com/Songmu/go-httpdate"
 
-	"github.com/0x111/telegram-rss-bot/db"
-	"github.com/0x111/telegram-rss-bot/models"
+	"github.com/ItalyPaleAle/rss-bot/db"
+	"github.com/ItalyPaleAle/rss-bot/models"
 )
 
 // Number of parallel requests to make

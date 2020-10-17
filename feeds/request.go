@@ -8,7 +8,7 @@ import (
 	"github.com/Songmu/go-httpdate"
 	"github.com/mmcdole/gofeed"
 
-	"github.com/0x111/telegram-rss-bot/models"
+	"github.com/ItalyPaleAle/rss-bot/models"
 )
 
 // RequestFeed requests a feed and parses it with gofeed

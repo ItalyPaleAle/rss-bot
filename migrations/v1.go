@@ -1,9 +1,7 @@
 package migrations
 
 import (
-	"github.com/0x111/telegram-rss-bot/db"
-
-	log "github.com/sirupsen/logrus"
+	"github.com/ItalyPaleAle/rss-bot/db"
 )
 
 func V1() error {
@@ -29,7 +27,6 @@ CREATE INDEX IF NOT EXISTS subscriptions_chat_id ON subscriptions (chat_id);
 
 	_, err := DB.Exec(sqlStmt)
 	if err != nil {
-		log.Error("Query error", err)
 		return err
 	}
 	return nil

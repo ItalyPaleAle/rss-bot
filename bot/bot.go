@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 	tb "gopkg.in/tucnak/telebot.v2"
 
-	"github.com/0x111/telegram-rss-bot/feeds"
+	"github.com/ItalyPaleAle/rss-bot/feeds"
 )
 
 // RSSBot is the class that manages the RSS bot

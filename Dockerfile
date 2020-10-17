@@ -1,4 +1,4 @@
-FROM golang:1.14-buster
+FROM golang:1.15-buster
 
 CMD /bin/init.sh /bin/rss-bot
 

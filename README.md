@@ -1,6 +1,6 @@
 # telegram-rss-bot
 
-![Build telegram-rss-bot](https://github.com/0x111/telegram-rss-bot/workflows/Build%20telegram-rss-bot/badge.svg)
+![Build telegram-rss-bot](https://github.com/ItalyPaleAle/rss-bot/workflows/Build%20telegram-rss-bot/badge.svg)
 
 ## Introduction
 This is an another telegram bot for usage with RSS feeds.
@@ -57,7 +57,7 @@ docker run -e TELEGRAM_AUTH_KEY="MY-TOKEN" ruthless/telegram-rss-bot
 ### Build from source
 Execute the following steps:
 ```
-git clone https://github.com/0x111/telegram-rss-bot
+git clone https://github.com/ItalyPaleAle/rss-bot
 docker build -t telegram-rss-bot:latest .
 docker run --name telegram-rss-bot -e TELEGRAM_AUTH_KEY="MY-TOKEN" -d telegram-rss-bot:latest
 ```

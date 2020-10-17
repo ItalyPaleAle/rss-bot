@@ -3,7 +3,7 @@ package bot
 import (
 	"fmt"
 
-	"github.com/0x111/telegram-rss-bot/feeds"
+	"github.com/ItalyPaleAle/rss-bot/feeds"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 

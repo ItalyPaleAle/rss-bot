@@ -12,8 +12,8 @@ import (
 	"github.com/Songmu/go-httpdate"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/0x111/telegram-rss-bot/db"
-	"github.com/0x111/telegram-rss-bot/models"
+	"github.com/ItalyPaleAle/rss-bot/db"
+	"github.com/ItalyPaleAle/rss-bot/models"
 )
 
 // Post represents a post in the feed
