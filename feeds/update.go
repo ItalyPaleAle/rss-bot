@@ -7,6 +7,9 @@ import (
 	"github.com/0x111/telegram-rss-bot/models"
 )
 
+// Number of parallel requests to make
+const parallelFetch = 4
+
 // SetUpdateChan sets the channel to use for notify the bot of new messages for subscribers
 func (f *Feeds) SetUpdateChan(ch chan<- UpdateMessage) {
 	f.updateCh = ch
@@ -41,49 +44,100 @@ func (f *Feeds) QueueUpdate() {
 	}()
 }
 
+type workerResult struct {
+	Feed  *models.Feed
+	Posts []Post
+}
+
+// Internal worker that fetches and processes feeds, in parallel
+func (f *Feeds) updateWorker(id int, jobs <-chan *models.Feed, results chan<- workerResult) {
+	for j := range jobs {
+		res := workerResult{
+			Feed: j,
+		}
+		f.log.Println("Worker", id, "started updating feed", j.ID)
+		// Fetch new data from the feed
+		posts, err := f.fetchFeed(j)
+		if err != nil {
+			// Error is already logged
+			// Just move to the next post
+			results <- res
+			continue
+		}
+		res.Posts = posts
+		f.log.Println("Worker", id, "finished updating feed", j.ID)
+		results <- res
+	}
+}
+
 // Worker that updates all feeds
 func (f *Feeds) updateFeeds() error {
 	f.log.Println("Started updating feeds")
 
+	// Start background workers to parallelize requests
+	jobs := make(chan *models.Feed)
+	results := make(chan workerResult)
+	for i := 1; i <= parallelFetch; i++ {
+		go f.updateWorker(i, jobs, results)
+	}
+
 	// Select all feeds
-	feed := &models.Feed{}
+	count := 0
 	rows, err := db.GetDB().Queryx("SELECT * FROM feeds")
-	defer rows.Close()
 	if err != nil {
+		rows.Close()
 		return err
 	}
-	// TODO: PARALLELIZE THIS
 	for rows.Next() {
 		// If the context was canceled, return
 		if err := f.ctx.Err(); err != nil {
+			rows.Close()
+			close(jobs)
+			close(results)
 			return err
 		}
 
 		// Read the row
+		feed := models.Feed{}
 		err = rows.StructScan(&feed)
 		if err != nil {
+			rows.Close()
+			close(jobs)
+			close(results)
 			return err
 		}
 
-		// Fetch new data from the feed
-		posts, err := f.fetchFeed(feed)
-		if err != nil {
-			// Error is already logged
-			// Just move to the next post
-			continue
-		}
+		// Get a worker to perform the request
+		jobs <- &feed
+		count++
+	}
+	rows.Close()
+	if err != nil {
+		close(jobs)
+		close(results)
+		return err
+	}
+
+	// Close the jobs channel
+	close(jobs)
+
+	// Read the results
+	for i := 0; i < count; i++ {
+		res := <-results
 
 		// If there are new posts…
-		if len(posts) > 0 {
-			// …first, queue an update the feed object
-			// This is deferred because we're still iterating through the rows from the feeds table
-			defer f.setLastPost(feed)
+		if len(res.Posts) > 0 {
+			// …first, update the feed object in the database
+			f.setLastPost(res.Feed)
 
 			// …second, notify subscribers
 			// Ignore errors (already logged)
-			_ = f.notifySubscribers(feed, posts)
+			_ = f.notifySubscribers(res.Feed, res.Posts)
 		}
 	}
+	close(results)
+
+	f.log.Println("Done updating feeds")
 
 	return nil
 }

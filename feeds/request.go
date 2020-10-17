@@ -67,5 +67,12 @@ func (f *Feeds) RequestFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
 
 	// Parse the feed
 	fp := gofeed.NewParser()
-	return fp.Parse(resp.Body)
+	posts, err = fp.Parse(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	f.log.Printf("Found %d posts in feed %d\n", len(posts.Items), feed.ID)
+
+	return posts, nil
 }
