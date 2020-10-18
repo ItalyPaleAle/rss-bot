@@ -13,6 +13,5 @@ RUN go get -v ./... \
 ## Runtime
 FROM gcr.io/distroless/base-debian10
 COPY --from=builder /go/bin/rss-bot /
-RUN mkdir /data
 ENV BOT_DBPATH /data/bot.db
 CMD ["/rss-bot"]
