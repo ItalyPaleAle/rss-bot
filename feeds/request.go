@@ -72,7 +72,11 @@ func (f *Feeds) RequestFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
 		return nil, err
 	}
 
-	f.log.Printf("Found %d posts in feed %d\n", len(posts.Items), feed.ID)
+	if feed.ID > 0 {
+		f.log.Printf("Found %d posts in feed %d\n", len(posts.Items), feed.ID)
+	} else {
+		f.log.Printf("Found %d posts in new feed\n", len(posts.Items))
+	}
 
 	return posts, nil
 }

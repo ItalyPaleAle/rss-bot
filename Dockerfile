@@ -6,6 +6,7 @@ WORKDIR /go/src/rss-bot
 COPY . /go/src/rss-bot
 
 # Build and test
+ENV CGO_ENABLED=1
 RUN go get -v ./... \
   && go build -v -o /go/build/rss-bot \
   && go test -v ./... 

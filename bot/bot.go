@@ -33,7 +33,7 @@ func (b *RSSBot) Init() (err error) {
 	// "token" is the default value in the config file
 	authKey := viper.GetString("TelegramAuthToken")
 	if authKey == "" || authKey == "token" {
-		return errors.New("Telegram auth key not set")
+		return errors.New("Telegram auth key not set. Please make sure that the 'TelegramAuthToken' option is present in the config file, or use the 'BOT_TELEGRAMAUTHTOKEN' environmental variable.")
 	}
 
 	// Poller

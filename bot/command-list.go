@@ -16,6 +16,11 @@ func (b *RSSBot) handleList(m *tb.Message) {
 	}
 
 	// Build the response
+	if len(feeds) == 0 {
+		b.respondToCommand(m, "This chat is not subscribed to any feed")
+		return
+	}
+
 	out := "Here's the list of feeds this chat is subscribed to:\n"
 	for i, f := range feeds {
 		out += fmt.Sprintf("%d: %s\n", (i + 1), f.Url)
