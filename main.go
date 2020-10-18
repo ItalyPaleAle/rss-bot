@@ -54,6 +54,9 @@ func loadConfig() {
 	// Read the config
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Sprintf("Fatal error config file: %s\n", err))
+		// Ignore errors if the config file doesn't exist
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			panic(fmt.Sprintf("Fatal error config file: %s\n", err))
+		}
 	}
 }
