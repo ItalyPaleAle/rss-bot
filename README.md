@@ -8,7 +8,7 @@ This is an another telegram bot for subscribing to RSS feeds, that you can host 
 
 ## System requirements
 
-This bot is designed to run on a Linux server. At the moment, only the amd64 architecture is supported.
+This bot is designed to run on a Linux server with Docker. Images for both amd64 and arm64 are published on Docker Hub and on GitHub Container Registry.
 
 ## Register your bot
 
@@ -60,26 +60,31 @@ When set, environmental variables take precedence over settings from config file
 - **`BOT_ALLOWEDUSERS`**: A comma-separated list of user IDs (e.g. `BOT_ALLOWEDUSERS="12345,98765"`); this is akin to the `AllowedUsers` option in the config file.
 - **`BOT_TELEGRAMAPIDEBUG`**: Equivalent to `TelegramAPIDebug` in the config file.
 
-## Docker support
+## Run with Docker
 
-You can also run this application as a docker container.
+The best way to run this bot is as a Docker container.
 
-### Docker hub
+The container image is published to both Docker Hub and GitHub Container Registry:
 
-You can pull the official docker image
-```bash
-docker pull ruthless/telegram-rss-bot
-docker run -e TelegramAuthToken="MY-TOKEN" ruthless/telegram-rss-bot
+- Docker Hub: `italypaleale/rss-bot`
+- GitHub Container Registry: `ghcr.io/italypaleale/rss-bot`
+
+To run with Docker:
+
+```sh
+# Replace "xxx" with your Telegram API token
+docker run \
+  -d \
+  --restart always \
+  --name rss-bot \
+  -v rssdb:/data \
+  -e BOT_TELEGRAMAUTHTOKEN=xxx \
+  italypaleale/rss-bot:latest
 ```
 
-### Build from source
+Note the Docker volume `rssdb` mounted to `/data`, which will contain the SQLite database. Optionally, you can mount that to a local folder too.
 
-Execute the following steps:
-```
-git clone https://github.com/ItalyPaleAle/rss-bot
-docker build -t telegram-rss-bot:latest .
-docker run --name telegram-rss-bot -e TelegramAuthToken="MY-TOKEN" -d telegram-rss-bot:latest
-```
+You can pass other configuration options via environmental variables. Alternatively, you can mount a config file via a Docker volume with the flag `-v /path/to/bot-config.json:/bot-config.json`
 
 ### Telegram rate limiting
 
