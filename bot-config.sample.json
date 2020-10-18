@@ -1,9 +1,7 @@
 {
-  "telegram_auth_key": "token",
-  "migrations": "v1",
-  "telegram_api_debug": false,
-  "db_path": "./bot.db",
-  "log_level": "info",
-  "feed_updates_interval": 600,
-  "allowed_users": [12345]
+  "TelegramAuthToken": "token",
+  "TelegramAPIDebug": false,
+  "DBPath": "./bot.db",
+  "FeedUpdateInterval": 600,
+  "AllowedUsers": []
 }

@@ -17,7 +17,7 @@ func GetDB() *sqlx.DB {
 func ConnectDB() *sqlx.DB {
 	// Init the singleton
 	var err error
-	db, err = sqlx.Open("sqlite3", "file:"+viper.GetString("db_path")+"?cache=shared")
+	db, err = sqlx.Open("sqlite3", "file:"+viper.GetString("DBPath")+"?cache=shared")
 	if err != nil {
 		panic(err)
 	}

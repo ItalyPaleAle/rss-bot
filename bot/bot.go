@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ func (b *RSSBot) Init() (err error) {
 
 	// Get the auth key
 	// "token" is the default value in the config file
-	authKey := viper.GetString("telegram_auth_key")
+	authKey := viper.GetString("TelegramAuthToken")
 	if authKey == "" || authKey == "token" {
 		return errors.New("Telegram auth key not set")
 	}
@@ -39,14 +40,8 @@ func (b *RSSBot) Init() (err error) {
 	var poller tb.Poller = &tb.LongPoller{Timeout: 10 * time.Second}
 
 	// Check if we're restricting the bot to certain users only
-	var allowedUsers map[int]bool
-	if uids := viper.GetIntSlice("allowed_users"); len(uids) > 0 {
-		// Create a map so lookups are faster
-		allowedUsers = make(map[int]bool, len(uids))
-		for i := 0; i < len(uids); i++ {
-			allowedUsers[uids[i]] = true
-		}
-
+	allowedUsers := b.getAllowedUsers()
+	if len(allowedUsers) > 0 {
 		// Create a middleware
 		poller = tb.NewMiddlewarePoller(poller, func(u *tb.Update) bool {
 			if u.Message == nil {
@@ -56,9 +51,9 @@ func (b *RSSBot) Init() (err error) {
 			// Restrict to certain users only
 			if u.Message.Sender == nil || u.Message.Sender.ID == 0 || !allowedUsers[u.Message.Sender.ID] {
 				if u.Message.Sender == nil {
-					b.log.Printf("Ignoring message from empty sender")
+					b.log.Println("Ignoring message from empty sender")
 				} else {
-					b.log.Printf("Ignoring message from un-allowed sender:", u.Message.Sender.ID)
+					b.log.Println("Ignoring message from un-allowed sender:", u.Message.Sender.ID)
 				}
 				return false
 			}
@@ -72,7 +67,7 @@ func (b *RSSBot) Init() (err error) {
 	b.bot, err = tb.NewBot(tb.Settings{
 		Token:   authKey,
 		Poller:  poller,
-		Verbose: viper.GetBool("telegram_api_debug"),
+		Verbose: viper.GetBool("TelegramAPIDebug"),
 	})
 	if err != nil {
 		return err
@@ -128,7 +123,7 @@ func (b *RSSBot) backgroundWorker() {
 	b.feeds.QueueUpdate()
 
 	// Ticker for updates
-	ticker := time.NewTicker(viper.GetDuration("feed_updates_interval") * time.Second)
+	ticker := time.NewTicker(viper.GetDuration("FeedUpdateInterval") * time.Second)
 	for {
 		select {
 		// On the interval, queue an update
@@ -224,4 +219,37 @@ func (b *RSSBot) registerCommands() (err error) {
 		{Text: "help", Description: "Show help message"},
 	})
 	return err
+}
+
+// Returns the list of allowed users (if any)
+// Returns a map so lookups are faster
+func (b *RSSBot) getAllowedUsers() (allowedUsers map[int]bool) {
+	// Check if we can get an int slice
+	uids := viper.GetIntSlice("AllowedUsers")
+	if len(uids) == 0 {
+		// Check if we can get a string
+		str := viper.GetString("AllowedUsers")
+		if str != "" {
+			// Split on commas
+			for _, s := range strings.Split(str, ",") {
+				// Ignore invalid ones
+				num, err := strconv.Atoi(s)
+				if err != nil || num < 1 {
+					continue
+				}
+				// Add to the map
+				if allowedUsers == nil {
+					allowedUsers = make(map[int]bool)
+				}
+				allowedUsers[num] = true
+			}
+		}
+	} else {
+		// Convert to a map
+		allowedUsers = make(map[int]bool, len(uids))
+		for i := 0; i < len(uids); i++ {
+			allowedUsers[uids[i]] = true
+		}
+	}
+	return
 }

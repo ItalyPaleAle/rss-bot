@@ -34,10 +34,24 @@ func main() {
 }
 
 func loadConfig() {
+	// Defaults
+	viper.SetDefault("TelegramAuthToken", "token")
+	viper.SetDefault("TelegramAPIDebug", false)
+	viper.SetDefault("DBPath", "./bot.db")
+	viper.SetDefault("FeedUpdateInterval", 600)
+	viper.SetDefault("AllowedUsers", nil)
+
+	// Env
+	viper.SetEnvPrefix("BOT")
+	viper.AutomaticEnv()
+
+	// Config file
 	viper.SetConfigName("bot-config")
-	viper.AddConfigPath("$HOME/.telegram-rss-bot")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("./.telegram-rss-bot")
+	viper.AddConfigPath("$HOME/.rss-bot")
+	viper.AddConfigPath("/etc/rss-bot")
+
+	// Read the config
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(fmt.Sprintf("Fatal error config file: %s\n", err))
