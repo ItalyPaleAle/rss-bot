@@ -1,0 +1,7 @@
+.git
+.gitignore
+.github
+.vscode
+Dockerfile
+bot-config.json
+bot-config.sample.json

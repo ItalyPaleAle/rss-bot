@@ -35,7 +35,7 @@ func main() {
 
 func loadConfig() {
 	// Defaults
-	viper.SetDefault("TelegramAuthToken", "token")
+	viper.SetDefault("TelegramAuthToken", "")
 	viper.SetDefault("TelegramAPIDebug", false)
 	viper.SetDefault("DBPath", "./bot.db")
 	viper.SetDefault("FeedUpdateInterval", 600)

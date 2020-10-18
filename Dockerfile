@@ -1,12 +1,18 @@
-FROM golang:1.15-buster
+## Builder
+FROM golang:1.15-buster AS builder
 
-CMD /bin/init.sh /bin/rss-bot
+# Copy the code
+WORKDIR /go/src/rss-bot
+COPY . /go/src/rss-bot
 
-COPY . /code
+# Build and test
+RUN go get -v ./... \
+  && go build -v -o /go/build/rss-bot \
+  && go test -v ./... 
 
-WORKDIR /code
-
-RUN go get ./...
-
-RUN make gh_linux_amd64
-RUN chmod -R g+rwx /code && cp build/telegram-rss-bot-linux-amd64 /bin/rss-bot && cp init.sh /bin
+## Runtime
+FROM gcr.io/distroless/base-debian10
+COPY --from=builder /go/bin/rss-bot /
+RUN mkdir /data
+ENV BOT_DBPATH /data/bot.db
+CMD ["/rss-bot"]
