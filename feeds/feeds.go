@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Songmu/go-httpdate"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
@@ -248,22 +247,11 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 	// Get the most recent, valid entry
 	if posts != nil && posts.Items != nil {
 		for _, el := range posts.Items {
-			// Skip items with an invalid date
-			parsePubDate, err := httpdate.Str2Time(el.Published, nil)
-			if err != nil {
-				f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", url, el.Published, err)
-				continue
-			}
-			if el.Title == "" {
-				f.log.Printf("Error in feed %s: skipping entry with empty title\n", url)
-				continue
-			}
-
 			// Check if this is newer than the one stored
-			if parsePubDate.After(feed.LastPostDate) {
+			if el != nil && el.PublishedParsed != nil && el.PublishedParsed.After(feed.LastPostDate) {
 				feed.LastPostTitle = el.Title
 				feed.LastPostLink = el.Link
-				feed.LastPostDate = parsePubDate
+				feed.LastPostDate = *el.PublishedParsed
 			}
 		}
 	}

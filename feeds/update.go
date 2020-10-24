@@ -1,8 +1,6 @@
 package feeds
 
 import (
-	"github.com/Songmu/go-httpdate"
-
 	"github.com/ItalyPaleAle/rss-bot/db"
 	"github.com/ItalyPaleAle/rss-bot/models"
 )
@@ -148,7 +146,7 @@ func (f *Feeds) updateFeeds() error {
 func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 	// Request the data
 	f.log.Printf("Updating feed %d (%s)\n", feed.ID, feed.Url)
-	posts, err := f.RequestFeed(feed)
+	posts, err := f.RequestRSSFeed(feed)
 	if err != nil {
 		f.log.Println("Error while fetching the feed:", err)
 		return nil, err
@@ -156,34 +154,23 @@ func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 
 	// Get all new entries
 	res := make([]Post, 0)
-	if posts != nil && posts.Items != nil {
+	if posts != nil && len(posts.Items) > 0 {
 		after := feed.LastPostDate
 		for _, el := range posts.Items {
-			// Skip items with an invalid date
-			parsePubDate, err := httpdate.Str2Time(el.Published, nil)
-			if err != nil {
-				f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", feed.Url, el.Published, err)
-				continue
-			}
-			if el.Title == "" {
-				f.log.Printf("Error in feed %s: skipping entry with empty title\n", feed.Url)
-				continue
-			}
-
 			// Check if this is a new post
-			if parsePubDate.After(after) {
+			if el != nil && el.PublishedParsed != nil && el.PublishedParsed.After(after) {
 				// Add it to the result
 				res = append(res, Post{
 					Title: el.Title,
 					Link:  el.Link,
-					Date:  parsePubDate,
+					Date:  *el.PublishedParsed,
 				})
 
 				// Look for the most recent post for updating the feed object
-				if parsePubDate.After(feed.LastPostDate) {
+				if el.PublishedParsed.After(feed.LastPostDate) {
 					feed.LastPostTitle = el.Title
 					feed.LastPostLink = el.Link
-					feed.LastPostDate = parsePubDate
+					feed.LastPostDate = *el.PublishedParsed
 				}
 			}
 		}
