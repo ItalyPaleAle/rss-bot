@@ -75,6 +75,11 @@ func (f *Feeds) RequestRSSFeed(feed *models.Feed) (posts *gofeed.Feed, err error
 	// Iterate through the results
 	n := 0
 	for _, el := range posts.Items {
+		// If there's an updated date, use that instead of published
+		if el.Updated != "" && el.UpdatedParsed != nil && !el.UpdatedParsed.IsZero() {
+			el.Published = el.Updated
+			el.PublishedParsed = el.UpdatedParsed
+		}
 		// Skip items with an invalid date
 		if el.PublishedParsed == nil || el.PublishedParsed.IsZero() {
 			f.log.Printf("Error in feed %s: skipping entry with invalid date '%s' (error: %s)\n", feed.Url, el.Published, err)
