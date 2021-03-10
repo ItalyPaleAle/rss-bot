@@ -1,5 +1,5 @@
 ## Builder
-FROM golang:1.15-buster AS builder
+FROM golang:1.16-buster AS builder
 
 # Copy the code
 WORKDIR /go/src/rss-bot

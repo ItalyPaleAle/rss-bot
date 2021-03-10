@@ -1,6 +1,6 @@
 module github.com/ItalyPaleAle/rss-bot
 
-go 1.15
+go 1.16
 
 require (
 	github.com/Songmu/go-httpdate v1.0.0
