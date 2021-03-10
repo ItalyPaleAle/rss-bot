@@ -2,6 +2,7 @@ package feeds
 
 import (
 	"errors"
+	"sort"
 	"strings"
 
 	"github.com/mmcdole/gofeed"
@@ -19,9 +20,20 @@ func (f *Feeds) RequestFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
 	switch {
 	// Docker Hub
 	case strings.HasPrefix(feed.Url, "https://hub.docker.com/"):
-		return f.RequestDockerFeed(feed)
+		posts, err = f.RequestDockerFeed(feed)
 	// Default: RSS feed
 	default:
-		return f.RequestRSSFeed(feed)
+		posts, err = f.RequestRSSFeed(feed)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort items by date, from old to new
+	sort.Slice(posts.Items, func(i, j int) bool {
+		return posts.Items[i].PublishedParsed.Before(*posts.Items[j].PublishedParsed)
+	})
+
+	return posts, nil
 }

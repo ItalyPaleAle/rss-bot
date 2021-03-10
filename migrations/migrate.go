@@ -6,11 +6,13 @@ import (
 
 // Migrate runs the migration suite
 func Migrate() {
-	// This is as bad as it seems, but it looked weird to use some complex tool for something as simple
-	// as creating a few tables for this small app.
+	// A rather makeshift solution, but it works for our simple scenario
 	err := V1()
-
 	if err != nil {
-		panic(fmt.Sprintln("Error migrating the database to the latest schema", err))
+		panic(fmt.Sprintln("Error migrating the database to V1", err))
+	}
+	err = V2()
+	if err != nil {
+		panic(fmt.Sprintln("Error migrating the database to V2", err))
 	}
 }

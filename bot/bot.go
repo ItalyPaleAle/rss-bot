@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -132,7 +133,10 @@ func (b *RSSBot) backgroundWorker() {
 
 		// Send messages on new posts
 		case msg := <-msgCh:
-			_, err := b.bot.Send(tb.ChatID(msg.ChatId), b.formatUpateMessage(&msg))
+			_, err := b.bot.Send(tb.ChatID(msg.ChatId), b.formatUpdateMessage(&msg), &tb.SendOptions{
+				ParseMode:             tb.ModeHTML,
+				DisableWebPagePreview: true,
+			})
 			if err != nil {
 				b.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())
 			}
@@ -148,12 +152,27 @@ func (b *RSSBot) backgroundWorker() {
 	}
 }
 
-// Formats a message with an update
-func (b *RSSBot) formatUpateMessage(msg *feeds.UpdateMessage) string {
-	// Note: the msg.Feed object might be nil when passed to this method
+// Returns a string in which HTML entities are escaped as required by Telegram: <>&
+func (b *RSSBot) escapeHTMLEntities(s string) string {
+	r := strings.NewReplacer("<", "&lt;", ">", "&gt;", "&", "&amp;")
+	return r.Replace(s)
+}
 
-	// Return the link only for now
-	return msg.Post.Link
+// Formats a message with an update
+func (b *RSSBot) formatUpdateMessage(msg *feeds.UpdateMessage) string {
+	// Note: the msg.Feed object might be nil when passed to this method
+	out := ""
+	if msg.Feed != nil {
+		out += fmt.Sprintf("%s:\n", b.escapeHTMLEntities(msg.Feed.Title))
+	}
+
+	// Add the content
+	out += fmt.Sprintf("<b>%s</b>\n%s\n%s\n",
+		b.escapeHTMLEntities(msg.Post.Title),
+		b.escapeHTMLEntities(msg.Post.Date.UTC().Format("Mon, 02 Jan 2006 15:04:05 MST")),
+		b.escapeHTMLEntities(msg.Post.Link),
+	)
+	return out
 }
 
 // Sends a response to a command

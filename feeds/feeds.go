@@ -236,7 +236,8 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 	// Get the feed to both validate it and to get the latest entry
 	f.log.Println("Fetching feed", url)
 	feed := &models.Feed{
-		Url: url,
+		Url:   url,
+		Title: url,
 	}
 	posts, err := f.RequestFeed(feed)
 	if err != nil {
@@ -256,8 +257,13 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 		}
 	}
 
+	// Get the feed's title
+	if posts != nil && posts.Title != "" {
+		feed.Title = posts.Title
+	}
+
 	// Add the feed to the database
-	res, err := querier.Exec("INSERT INTO feeds (feed_url, feed_last_modified, feed_etag, feed_last_post_title, feed_last_post_link, feed_last_post_date) VALUES (?, ?, ?, ?, ?, ?)", feed.Url, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate)
+	res, err := querier.Exec("INSERT INTO feeds (feed_url, feed_title, feed_last_modified, feed_etag, feed_last_post_title, feed_last_post_link, feed_last_post_date) VALUES (?, ?, ?, ?, ?, ?, ?)", feed.Url, feed.Title, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate)
 	if err != nil {
 		f.log.Println("Error querying the database:", err)
 		return nil, err

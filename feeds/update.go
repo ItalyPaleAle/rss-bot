@@ -176,6 +176,12 @@ func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 		}
 	}
 
+	// Get the latest feed's title
+	feed.Title = feed.Url
+	if posts != nil && posts.Title != "" {
+		feed.Title = posts.Title
+	}
+
 	return res, nil
 }
 
@@ -186,7 +192,7 @@ func (f *Feeds) setLastPost(feed *models.Feed) {
 
 	// Note that we're not using a transaction here (because the update process can take a while), but there's only one of these methods that can be running at the same time
 	// The bot can be deleting the feed in the meanwhile, but this would just make the next query fail (and that's why we're ignoring the error here)
-	_, err := db.GetDB().Exec("UPDATE feeds SET feed_last_modified = ?, feed_etag = ?, feed_last_post_title = ?, feed_last_post_link = ?, feed_last_post_date = ? WHERE feed_id = ?", feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.ID)
+	_, err := db.GetDB().Exec("UPDATE feeds SET feed_title = ?, feed_last_modified = ?, feed_etag = ?, feed_last_post_title = ?, feed_last_post_link = ?, feed_last_post_date = ? WHERE feed_id = ?", feed.Title, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.ID)
 	if err != nil {
 		f.log.Printf("Error while updating the last post for feed %s (id: %d), but continuing to next. Error: %s\n", feed.Url, feed.ID, err)
 	}

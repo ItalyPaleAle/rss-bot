@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 	chat_id integer not null
 );
 CREATE INDEX IF NOT EXISTS subscriptions_chat_id ON subscriptions (chat_id);
+CREATE TABLE IF NOT EXISTS migrations (
+	version integer
+);
 `
 
 	_, err := DB.Exec(sqlStmt)
