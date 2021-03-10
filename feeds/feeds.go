@@ -240,7 +240,7 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 	}
 	posts, err := f.RequestFeed(feed)
 	if err != nil {
-		f.log.Println("Error while fetching the feed:", err)
+		f.log.Printf("Error while fetching feed %d: %s\n", feed.ID, err)
 		return nil, err
 	}
 

@@ -146,9 +146,9 @@ func (f *Feeds) updateFeeds() error {
 func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 	// Request the data
 	f.log.Printf("Updating feed %d (%s)\n", feed.ID, feed.Url)
-	posts, err := f.RequestRSSFeed(feed)
+	posts, err := f.RequestFeed(feed)
 	if err != nil {
-		f.log.Println("Error while fetching the feed:", err)
+		f.log.Printf("Error while fetching feed %d: %s\n", feed.ID, err)
 		return nil, err
 	}
 
