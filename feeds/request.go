@@ -31,9 +31,11 @@ func (f *Feeds) RequestFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
 	}
 
 	// Sort items by date, from old to new
-	sort.Slice(posts.Items, func(i, j int) bool {
-		return posts.Items[i].PublishedParsed.Before(*posts.Items[j].PublishedParsed)
-	})
+	if posts != nil && posts.Items != nil && len(posts.Items) > 0 {
+		sort.Slice(posts.Items, func(i, j int) bool {
+			return posts.Items[i].PublishedParsed.Before(*posts.Items[j].PublishedParsed)
+		})
+	}
 
 	return posts, nil
 }
