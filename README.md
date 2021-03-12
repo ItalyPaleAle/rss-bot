@@ -1,8 +1,10 @@
 # RSS bot for Telegram
 
-This is an another telegram bot for subscribing to RSS feeds, that you can host yourself.
+This is an another Telegram bot for subscribing to RSS feeds, that you can host yourself.
 
-> This project started as a hard fork of [0x111/telegram-rss-bot](https://github.com/0x111/telegram-rss-bot), created by Richard Szolár and released under a MIT license. However, the codebase has been heavily modified from the original and it includes significant improvements in reducing consumption of resources (storage, bandwidth, disk I/O).
+In addition to RSS and Atom feeds from anywhere, you can pass an address from Docker Hub to monitor new container images.
+
+> This project started as a hard fork of [0x111/telegram-rss-bot](https://github.com/0x111/telegram-rss-bot), created by Richard Szolár and released under a MIT license. However, the codebase has been heavily modified from the original and it includes significant improvements to reduce resource consumption (storage, bandwidth, disk I/O) and adds new features.
 
 # Setup
 
@@ -88,4 +90,4 @@ You can pass other configuration options via environmental variables. Alternativ
 
 ### Telegram rate limiting
 
-Note the [API rate limis](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this) for Telegram.
+Note the [API rate limits](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this) for Telegram.
