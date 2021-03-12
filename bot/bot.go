@@ -133,13 +133,8 @@ func (b *RSSBot) backgroundWorker() {
 
 		// Send messages on new posts
 		case msg := <-msgCh:
-			_, err := b.bot.Send(tb.ChatID(msg.ChatId), b.formatUpdateMessage(&msg), &tb.SendOptions{
-				ParseMode:             tb.ModeHTML,
-				DisableWebPagePreview: true,
-			})
-			if err != nil {
-				b.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())
-			}
+			// This method logs errors already
+			b.sendFeedUpdate(tb.ChatID(msg.ChatId), &msg)
 
 		// Context canceled
 		case <-b.ctx.Done():
@@ -158,16 +153,49 @@ func (b *RSSBot) escapeHTMLEntities(s string) string {
 	return r.Replace(s)
 }
 
+// Sends a message with a feed's post
+func (b *RSSBot) sendFeedUpdate(recipient tb.Recipient, msg *feeds.UpdateMessage) {
+	// Send title
+	_, err := b.bot.Send(
+		recipient,
+		b.formatUpdateMessage(msg),
+		&tb.SendOptions{
+			ParseMode:             tb.ModeHTML,
+			DisableWebPagePreview: true,
+		},
+	)
+	if err != nil {
+		b.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())
+		return
+	}
+
+	// Send photo, if any
+	// Note that this might fail, for example if the image is too big (>5MB)
+	if msg.Post.Photo != "" {
+		_, err = b.bot.Send(
+			recipient,
+			&tb.Photo{File: tb.FromURL(msg.Post.Photo)},
+			&tb.SendOptions{
+				// Do not send notifications for subsequent messages
+				DisableNotification: true,
+			},
+		)
+		if err != nil {
+			b.log.Printf("Error sending photo %s to chat %d: %s\n", msg.Post.Photo, msg.ChatId, err.Error())
+		}
+	}
+}
+
 // Formats a message with an update
 func (b *RSSBot) formatUpdateMessage(msg *feeds.UpdateMessage) string {
 	// Note: the msg.Feed object might be nil when passed to this method
 	out := ""
 	if msg.Feed != nil {
-		out += fmt.Sprintf("%s:\n", b.escapeHTMLEntities(msg.Feed.Title))
+		out += fmt.Sprintf("🎙 %s:\n", b.escapeHTMLEntities(msg.Feed.Title))
 	}
 
 	// Add the content
-	out += fmt.Sprintf("<b>%s</b>\n%s\n%s\n",
+	out += fmt.Sprintf("📬 <b>%s</b>\n🕓 %s\n🔗 %s\n",
 		b.escapeHTMLEntities(msg.Post.Title),
 		b.escapeHTMLEntities(msg.Post.Date.UTC().Format("Mon, 02 Jan 2006 15:04:05 MST")),
 		b.escapeHTMLEntities(msg.Post.Link),

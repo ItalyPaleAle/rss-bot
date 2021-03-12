@@ -38,10 +38,7 @@ func (b *RSSBot) handleAdd(m *tb.Message) {
 	b.bot.Edit(wm, fmt.Sprintf("The feed with URL %s was successfully added to this channel. Here is the last post published:", url), &tb.SendOptions{
 		DisableWebPagePreview: true,
 	})
-	b.bot.Send(m.Sender, b.formatUpdateMessage(&feeds.UpdateMessage{
+	b.sendFeedUpdate(m.Sender, &feeds.UpdateMessage{
 		Post: *post,
-	}), &tb.SendOptions{
-		ParseMode:             tb.ModeHTML,
-		DisableWebPagePreview: true,
 	})
 }

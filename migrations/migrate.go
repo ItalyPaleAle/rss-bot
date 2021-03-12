@@ -15,4 +15,8 @@ func Migrate() {
 	if err != nil {
 		panic(fmt.Sprintln("Error migrating the database to V2", err))
 	}
+	err = V3()
+	if err != nil {
+		panic(fmt.Sprintln("Error migrating the database to V3", err))
+	}
 }

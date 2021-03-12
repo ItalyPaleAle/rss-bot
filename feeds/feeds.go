@@ -20,6 +20,7 @@ type Post struct {
 	Title string
 	Link  string
 	Date  time.Time
+	Photo string
 }
 
 // UpdateMessage is the message that needs to be sent to subscribers for new posts
@@ -129,6 +130,7 @@ func (f *Feeds) AddSubscription(url string, chatId int64) (*Post, error) {
 		Title: feed.LastPostTitle,
 		Link:  feed.LastPostLink,
 		Date:  feed.LastPostDate,
+		Photo: feed.LastPostPhoto,
 	}
 	return post, nil
 }
@@ -250,9 +252,19 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 		for _, el := range posts.Items {
 			// Check if this is newer than the one stored
 			if el != nil && el.PublishedParsed != nil && el.PublishedParsed.After(feed.LastPostDate) {
-				feed.LastPostTitle = el.Title
-				feed.LastPostLink = el.Link
-				feed.LastPostDate = *el.PublishedParsed
+				p := Post{
+					Title: el.Title,
+					Link:  el.Link,
+					Date:  *el.PublishedParsed,
+				}
+
+				// Request the metadata for the post
+				f.RequestMetadata(&p)
+
+				feed.LastPostTitle = p.Title
+				feed.LastPostLink = p.Link
+				feed.LastPostDate = p.Date
+				feed.LastPostPhoto = p.Photo
 			}
 		}
 	}
@@ -263,9 +275,9 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 	}
 
 	// Add the feed to the database
-	res, err := querier.Exec("INSERT INTO feeds (feed_url, feed_title, feed_last_modified, feed_etag, feed_last_post_title, feed_last_post_link, feed_last_post_date) VALUES (?, ?, ?, ?, ?, ?, ?)", feed.Url, feed.Title, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate)
+	res, err := querier.Exec("INSERT INTO feeds (feed_url, feed_title, feed_last_modified, feed_etag, feed_last_post_title, feed_last_post_link, feed_last_post_date, feed_last_post_photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", feed.Url, feed.Title, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.LastPostPhoto)
 	if err != nil {
-		f.log.Println("Error querying the database:", err)
+		f.log.Println("Error inserting in the database:", err)
 		return nil, err
 	}
 	feed.ID, err = res.LastInsertId()

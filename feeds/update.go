@@ -159,18 +159,24 @@ func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 		for _, el := range posts.Items {
 			// Check if this is a new post
 			if el != nil && el.PublishedParsed != nil && el.PublishedParsed.After(after) {
-				// Add it to the result
-				res = append(res, Post{
+				p := Post{
 					Title: el.Title,
 					Link:  el.Link,
 					Date:  *el.PublishedParsed,
-				})
+				}
+
+				// Request the metadata for the post
+				f.RequestMetadata(&p)
+
+				// Add it to the result
+				res = append(res, p)
 
 				// Look for the most recent post for updating the feed object
 				if el.PublishedParsed.After(feed.LastPostDate) {
-					feed.LastPostTitle = el.Title
-					feed.LastPostLink = el.Link
-					feed.LastPostDate = *el.PublishedParsed
+					feed.LastPostTitle = p.Title
+					feed.LastPostLink = p.Link
+					feed.LastPostDate = p.Date
+					feed.LastPostPhoto = p.Photo
 				}
 			}
 		}
@@ -192,9 +198,9 @@ func (f *Feeds) setLastPost(feed *models.Feed) {
 
 	// Note that we're not using a transaction here (because the update process can take a while), but there's only one of these methods that can be running at the same time
 	// The bot can be deleting the feed in the meanwhile, but this would just make the next query fail (and that's why we're ignoring the error here)
-	_, err := db.GetDB().Exec("UPDATE feeds SET feed_title = ?, feed_last_modified = ?, feed_etag = ?, feed_last_post_title = ?, feed_last_post_link = ?, feed_last_post_date = ? WHERE feed_id = ?", feed.Title, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.ID)
+	_, err := db.GetDB().Exec("UPDATE feeds SET feed_title = ?, feed_last_modified = ?, feed_etag = ?, feed_last_post_title = ?, feed_last_post_link = ?, feed_last_post_date = ?, feed_last_post_photo = ? WHERE feed_id = ?", feed.Title, feed.LastModified, feed.ETag, feed.LastPostTitle, feed.LastPostLink, feed.LastPostDate, feed.LastPostPhoto, feed.ID)
 	if err != nil {
-		f.log.Printf("Error while updating the last post for feed %s (id: %d), but continuing to next. Error: %s\n", feed.Url, feed.ID, err)
+		f.log.Printf("Error while updating the last post for feed %s (id: %d), but continuing with next. Error: %s\n", feed.Url, feed.ID, err)
 	}
 }
 

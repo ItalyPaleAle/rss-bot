@@ -12,4 +12,5 @@ type Feed struct {
 	LastPostTitle string    `db:"feed_last_post_title"`
 	LastPostLink  string    `db:"feed_last_post_link"`
 	LastPostDate  time.Time `db:"feed_last_post_date"`
+	LastPostPhoto string    `db:"feed_last_post_photo"`
 }
