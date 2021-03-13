@@ -88,6 +88,12 @@ Note the Docker volume `rssdb` mounted to `/data`, which will contain the SQLite
 
 You can pass other configuration options via environmental variables. Alternatively, you can mount a config file via a Docker volume with the flag `-v /path/to/bot-config.json:/bot-config.json`
 
+## Caveats
+
 ### Telegram rate limiting
 
 Note the [API rate limits](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this) for Telegram.
+
+### Do not run on 32-bit systems
+
+This app depends on the Telebot framework, which should not be used on 32-bit systems because of a current [implementation issue](https://github.com/tucnak/telebot/issues/314). Official binaries and Docker images are only published for amd64 and arm64.

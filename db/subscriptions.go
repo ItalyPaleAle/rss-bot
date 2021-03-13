@@ -1,4 +1,4 @@
-package models
+package db
 
 // Model for the subscriptions table
 type Subscription struct {

@@ -7,7 +7,7 @@ import (
 )
 
 // Handles /list commands
-func (b *RSSBot) handleList(m *tb.Message) {
+func (b *FeedBot) handleList(m *tb.Message) {
 	// Get the list of subscriptions
 	feeds, err := b.feeds.ListSubscriptions(m.Chat.ID)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
-	"github.com/ItalyPaleAle/rss-bot/models"
 )
 
 // Post represents a post in the feed
@@ -25,7 +24,7 @@ type Post struct {
 
 // UpdateMessage is the message that needs to be sent to subscribers for new posts
 type UpdateMessage struct {
-	Feed   *models.Feed
+	Feed   *db.Feed
 	Post   Post
 	ChatId int64
 }
@@ -98,7 +97,7 @@ func (f *Feeds) AddSubscription(url string, chatId int64) (*Post, error) {
 	}
 
 	// Check if the subscription already exists
-	subscription := &models.Subscription{}
+	subscription := &db.Subscription{}
 	err = tx.Get(subscription, "SELECT subscription_id FROM subscriptions WHERE feed_id = ? AND chat_id = ? LIMIT 1", feed.ID, chatId)
 	// There should be an error, and it should be ErrNoRows
 	if err == nil {
@@ -156,7 +155,7 @@ func (f *Feeds) DeleteSubscription(feedId int64, chatId int64) error {
 	}
 
 	// Check if there are other subscriptions for this feed
-	subscription := &models.Subscription{}
+	subscription := &db.Subscription{}
 	err = tx.Get(subscription, "SELECT subscription_id FROM subscriptions WHERE feed_id = ?", feedId)
 	if err != nil {
 		// If there are no more rows, delete the feed
@@ -184,11 +183,11 @@ func (f *Feeds) DeleteSubscription(feedId int64, chatId int64) error {
 }
 
 // ListSubscriptions lists all subscriptions for a chat
-func (f *Feeds) ListSubscriptions(chatId int64) ([]models.Feed, error) {
+func (f *Feeds) ListSubscriptions(chatId int64) ([]db.Feed, error) {
 	DB := db.GetDB()
 
 	// Query the DB
-	rows := []models.Feed{}
+	rows := []db.Feed{}
 	err := DB.Select(&rows, "SELECT feeds.* FROM feeds, subscriptions WHERE chat_id = ? AND feeds.feed_id = subscriptions.feed_id ORDER BY feed_url ASC", chatId)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -204,7 +203,7 @@ func (f *Feeds) ListSubscriptions(chatId int64) ([]models.Feed, error) {
 
 // GetFeedByURL returns a feed from its URL, or 0 if it's not present
 // The transaction is optional
-func (f *Feeds) GetFeedByURL(url string, tx *sqlx.Tx) (*models.Feed, error) {
+func (f *Feeds) GetFeedByURL(url string, tx *sqlx.Tx) (*db.Feed, error) {
 	// Use a transaction if we have one
 	var querier sqlx.Ext = db.GetDB()
 	if tx != nil {
@@ -212,7 +211,7 @@ func (f *Feeds) GetFeedByURL(url string, tx *sqlx.Tx) (*models.Feed, error) {
 	}
 
 	// Run the query
-	feed := &models.Feed{}
+	feed := &db.Feed{}
 	err := sqlx.Get(querier, feed, "SELECT * FROM feeds WHERE feed_url = ?", url)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -228,7 +227,7 @@ func (f *Feeds) GetFeedByURL(url string, tx *sqlx.Tx) (*models.Feed, error) {
 
 // AddFeed adds a new feed
 // The transaction is optional
-func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
+func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*db.Feed, error) {
 	// Use a transaction if we have one
 	var querier sqlx.Ext = db.GetDB()
 	if tx != nil {
@@ -237,7 +236,7 @@ func (f *Feeds) AddFeed(url string, tx *sqlx.Tx) (*models.Feed, error) {
 
 	// Get the feed to both validate it and to get the latest entry
 	f.log.Println("Fetching feed", url)
-	feed := &models.Feed{
+	feed := &db.Feed{
 		Url:   url,
 		Title: url,
 	}

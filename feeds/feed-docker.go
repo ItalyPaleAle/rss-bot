@@ -10,7 +10,7 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"github.com/ItalyPaleAle/rss-bot/models"
+	"github.com/ItalyPaleAle/rss-bot/db"
 )
 
 var dockerHubMatch = regexp.MustCompile("^https:\\/\\/hub\\.docker\\.com\\/((r|repository\\/docker)\\/([a-z0-9]+)|_)\\/(.*?)$")
@@ -25,7 +25,7 @@ type dockerHubTagList struct {
 }
 
 // RequestDockerFeed requests a "feed" containing the latest tags for an image on Docker Hub
-func (f *Feeds) RequestDockerFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
+func (f *Feeds) RequestDockerFeed(feed *db.Feed) (posts *gofeed.Feed, err error) {
 	// Get the username and repository name
 	match := dockerHubMatch.FindStringSubmatch(feed.Url)
 	if len(match) < 5 {

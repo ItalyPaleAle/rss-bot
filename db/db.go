@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/ItalyPaleAle/rss-bot/utils"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/viper"
+
+	"github.com/ItalyPaleAle/rss-bot/utils"
 )
 
 var (

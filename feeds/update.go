@@ -2,7 +2,6 @@ package feeds
 
 import (
 	"github.com/ItalyPaleAle/rss-bot/db"
-	"github.com/ItalyPaleAle/rss-bot/models"
 )
 
 // Number of parallel requests to make
@@ -43,12 +42,12 @@ func (f *Feeds) QueueUpdate() {
 }
 
 type workerResult struct {
-	Feed  *models.Feed
+	Feed  *db.Feed
 	Posts []Post
 }
 
 // Internal worker that fetches and processes feeds, in parallel
-func (f *Feeds) updateWorker(id int, jobs <-chan *models.Feed, results chan<- workerResult) {
+func (f *Feeds) updateWorker(id int, jobs <-chan *db.Feed, results chan<- workerResult) {
 	for j := range jobs {
 		res := workerResult{
 			Feed: j,
@@ -74,7 +73,7 @@ func (f *Feeds) updateFeeds() error {
 
 	// Start background workers to parallelize requests
 	// Channels' buffer is 4x the number of workers
-	jobs := make(chan *models.Feed, (parallelFetch * 4))
+	jobs := make(chan *db.Feed, (parallelFetch * 4))
 	results := make(chan workerResult, (parallelFetch * 4))
 	for i := 1; i <= parallelFetch; i++ {
 		go f.updateWorker(i, jobs, results)
@@ -97,7 +96,7 @@ func (f *Feeds) updateFeeds() error {
 		}
 
 		// Read the row
-		feed := models.Feed{}
+		feed := db.Feed{}
 		err = rows.StructScan(&feed)
 		if err != nil {
 			rows.Close()
@@ -143,7 +142,7 @@ func (f *Feeds) updateFeeds() error {
 
 // Fetches a feed and return the new posts only
 // If there are new posts, the feed object is updated too as a side effect
-func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
+func (f *Feeds) fetchFeed(feed *db.Feed) ([]Post, error) {
 	// Request the data
 	f.log.Printf("Updating feed %d (%s)\n", feed.ID, feed.Url)
 	posts, err := f.RequestFeed(feed)
@@ -193,7 +192,7 @@ func (f *Feeds) fetchFeed(feed *models.Feed) ([]Post, error) {
 
 // Update a feed in the database, setting the new details for the last post
 // This doesn't return errors but it only logs them
-func (f *Feeds) setLastPost(feed *models.Feed) {
+func (f *Feeds) setLastPost(feed *db.Feed) {
 	f.log.Printf("Updating last post for feed %d\n", feed.ID)
 
 	// Note that we're not using a transaction here (because the update process can take a while), but there's only one of these methods that can be running at the same time
@@ -205,9 +204,9 @@ func (f *Feeds) setLastPost(feed *models.Feed) {
 }
 
 // Sends a notification to all subscribers when a new post is out
-func (f *Feeds) notifySubscribers(feed *models.Feed, posts []Post) error {
+func (f *Feeds) notifySubscribers(feed *db.Feed, posts []Post) error {
 	// Get the list of subscribers for this feed
-	sub := &models.Subscription{}
+	sub := &db.Subscription{}
 	rows, err := db.GetDB().Queryx("SELECT chat_id FROM subscriptions WHERE feed_id = ?", feed.ID)
 	defer rows.Close()
 	if err != nil {

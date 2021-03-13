@@ -3,5 +3,5 @@
 .github
 .vscode
 Dockerfile
-bot-config.json
-bot-config.sample.json
+config.json
+config.sample.json

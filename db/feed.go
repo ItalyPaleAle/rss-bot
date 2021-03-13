@@ -1,6 +1,8 @@
-package models
+package db
 
-import "time"
+import (
+	"time"
+)
 
 // Model for the feeds table
 type Feed struct {

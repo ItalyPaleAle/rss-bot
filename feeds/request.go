@@ -7,11 +7,11 @@ import (
 
 	"github.com/mmcdole/gofeed"
 
-	"github.com/ItalyPaleAle/rss-bot/models"
+	"github.com/ItalyPaleAle/rss-bot/db"
 )
 
 // RequestFeed requests a feed of any kind
-func (f *Feeds) RequestFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
+func (f *Feeds) RequestFeed(feed *db.Feed) (posts *gofeed.Feed, err error) {
 	if feed.Url == "" {
 		return nil, errors.New("empty feed URL")
 	}

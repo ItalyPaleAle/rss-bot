@@ -8,7 +8,7 @@ import (
 )
 
 // Handles /remove commands
-func (b *RSSBot) handleRemove(m *tb.Message) {
+func (b *FeedBot) handleRemove(m *tb.Message) {
 	// Get args
 	args := GetArgs(m.Payload)
 	if len(args) != 1 {
@@ -53,7 +53,7 @@ func (b *RSSBot) handleRemove(m *tb.Message) {
 }
 
 // Handles the callbacks with "confirm-remove" action
-func (b *RSSBot) callbackConfirmRemove(cb *tb.Callback, userData string) {
+func (b *FeedBot) callbackConfirmRemove(cb *tb.Callback, userData string) {
 	// Get the feed ID to delete
 	feedId, err := strconv.Atoi(userData)
 	if err != nil || feedId < 1 {

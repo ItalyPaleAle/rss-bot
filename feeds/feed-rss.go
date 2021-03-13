@@ -8,12 +8,12 @@ import (
 	"github.com/Songmu/go-httpdate"
 	"github.com/mmcdole/gofeed"
 
-	"github.com/ItalyPaleAle/rss-bot/models"
+	"github.com/ItalyPaleAle/rss-bot/db"
 )
 
 // RequestRSSFeed requests a RSS feed and parses it with gofeed
 // We're using this rather than gofeed.ParseURL to have more control on the request
-func (f *Feeds) RequestRSSFeed(feed *models.Feed) (posts *gofeed.Feed, err error) {
+func (f *Feeds) RequestRSSFeed(feed *db.Feed) (posts *gofeed.Feed, err error) {
 	if feed.Url == "" {
 		return nil, errors.New("empty feed URL")
 	}

@@ -1,34 +1,37 @@
 package bot
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/viper"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	tb "gopkg.in/tucnak/telebot.v2"
 
-	"github.com/ItalyPaleAle/rss-bot/feeds"
+	pb "github.com/ItalyPaleAle/rss-bot/proto"
 )
 
-// RSSBot is the class that manages the RSS bot
-type RSSBot struct {
+// BotManager is the class that manages the bot
+type BotManager struct {
 	log    *log.Logger
 	bot    *tb.Bot
-	feeds  *feeds.Feeds
 	ctx    context.Context
 	cancel context.CancelFunc
+	routes []routeDefinition
 }
 
 // Init the object
-func (b *RSSBot) Init() (err error) {
+func (b *BotManager) Init() (err error) {
 	// Init the logger
-	b.log = log.New(os.Stdout, "rss-bot: ", log.Ldate|log.Ltime|log.LUTC)
+	b.log = log.New(os.Stdout, "bot: ", log.Ldate|log.Ltime|log.LUTC)
 
 	// Get the auth key
 	// "token" is the default value in the config file
@@ -44,23 +47,7 @@ func (b *RSSBot) Init() (err error) {
 	allowedUsers := b.getAllowedUsers()
 	if len(allowedUsers) > 0 {
 		// Create a middleware
-		poller = tb.NewMiddlewarePoller(poller, func(u *tb.Update) bool {
-			if u.Message == nil {
-				return true
-			}
-
-			// Restrict to certain users only
-			if u.Message.Sender == nil || u.Message.Sender.ID == 0 || !allowedUsers[u.Message.Sender.ID] {
-				if u.Message.Sender == nil {
-					b.log.Println("Ignoring message from empty sender")
-				} else {
-					b.log.Println("Ignoring message from un-allowed sender:", u.Message.Sender.ID)
-				}
-				return false
-			}
-
-			return true
-		})
+		poller = tb.NewMiddlewarePoller(poller, b.allowedUsersMiddleware(allowedUsers))
 	}
 
 	// Create the bot object
@@ -74,203 +61,359 @@ func (b *RSSBot) Init() (err error) {
 		return err
 	}
 
+	// Handle messages
+	b.handleMessages()
+
 	return nil
 }
 
 // Start the background workers
-func (b *RSSBot) Start() error {
+func (b *BotManager) Start() error {
 	// Context, that can be used to stop the bot
 	b.ctx, b.cancel = context.WithCancel(context.Background())
 
-	// Init the feeds object
-	b.feeds = &feeds.Feeds{}
-	err := b.feeds.Init(b.ctx)
-	if err != nil {
-		return err
-	}
-
-	// Register the command handlers
-	err = b.registerCommands()
-	if err != nil {
-		return err
-	}
-
-	// Start the background worker
-	go b.backgroundWorker()
-
 	// Start the bot
-	log.Println("Bot starting")
+	b.log.Println("Bot starting")
 	b.bot.Start()
 
 	return nil
 }
 
 // Stop the bot and the background processes
-func (b *RSSBot) Stop() {
+func (b *BotManager) Stop() {
 	b.cancel()
 }
 
-// In background, start updating feeds periodically and send messages on new posts
-// Also watch for the stop message
-func (b *RSSBot) backgroundWorker() {
-	// Sleep for 2 seconds
-	time.Sleep(2 * time.Second)
-
-	// Channel for receiving messages to send
-	msgCh := make(chan feeds.UpdateMessage)
-	b.feeds.SetUpdateChan(msgCh)
-
-	// Queue an update right away
-	b.feeds.QueueUpdate()
-
-	// Ticker for updates
-	ticker := time.NewTicker(viper.GetDuration("FeedUpdateInterval") * time.Second)
-	for {
-		select {
-		// On the interval, queue an update
-		case <-ticker.C:
-			b.feeds.QueueUpdate()
-
-		// Send messages on new posts
-		case msg := <-msgCh:
-			// This method logs errors already
-			b.sendFeedUpdate(tb.ChatID(msg.ChatId), &msg)
-
-		// Context canceled
-		case <-b.ctx.Done():
-			// Stop the bot
-			b.bot.Stop()
-			// Stop the ticker
-			ticker.Stop()
-			return
-		}
+// SendMessage sends a message to a chat or user
+func (b *BotManager) SendMessage(msg *pb.OutMessage) (*pb.SentMessage, error) {
+	// Ensure we have a recipient
+	if msg.Recipient == "" {
+		return nil, errors.New("Message does not have any recipient")
 	}
-}
 
-// Returns a string in which HTML entities are escaped as required by Telegram: <>&
-func (b *RSSBot) escapeHTMLEntities(s string) string {
-	r := strings.NewReplacer("<", "&lt;", ">", "&gt;", "&", "&amp;")
-	return r.Replace(s)
-}
+	// Convert the recipient to an object that implements tb.Recipient
+	recipient := msgRecipient{msg.Recipient}
 
-// Sends a message with a feed's post
-func (b *RSSBot) sendFeedUpdate(recipient tb.Recipient, msg *feeds.UpdateMessage) {
-	// Send title
-	_, err := b.bot.Send(
-		recipient,
-		b.formatUpdateMessage(msg),
-		&tb.SendOptions{
-			ParseMode:             tb.ModeHTML,
-			DisableWebPagePreview: true,
-		},
-	)
+	// Content
+	var content interface{}
+
+	// Send options
+	opts := &tb.SendOptions{}
+	if msg.DisableNotification {
+		opts.DisableNotification = true
+	}
+	if msg.DisableWebPagePreview {
+		opts.DisableWebPagePreview = true
+	}
+
+	// Check if we're replying to a message
+	if msg.ReplyTo > 0 {
+		// Check if we can safely cast from int64 to int
+		if int64(int(msg.ReplyTo)) != msg.ReplyTo {
+			return nil, errors.New("Conversion of message ID to reply to would overflow")
+		}
+		opts.ReplyTo = &tb.Message{ID: int(msg.ReplyTo)}
+	}
+
+	// Process the message depending on its type
+	switch c := msg.Content.(type) {
+	case *pb.OutMessage_Text:
+		// Text message
+		if c.Text == nil || c.Text.Text == "" {
+			return nil, errors.New("Message's text content is empty")
+		}
+		content = c.Text.Text
+
+		// Set parse mode, if needed
+		switch c.Text.ParseMode {
+		case pb.ParseMode_HTML:
+			opts.ParseMode = tb.ModeHTML
+		case pb.ParseMode_MARKDOWN:
+			opts.ParseMode = tb.ModeMarkdown
+		case pb.ParseMode_MARKDOWN_V2:
+			opts.ParseMode = tb.ModeMarkdownV2
+		}
+
+	case *pb.OutMessage_File:
+		// Message is a file
+		if c.File == nil || c.File.Location == nil {
+			return nil, errors.New("Message's file location is empty or invalid")
+		}
+		switch f := c.File.Location.(type) {
+		case *pb.OutFileMessage_Url:
+			if f.Url == "" {
+				return nil, errors.New("Message's file URL is empty or invalid")
+			}
+			content = tb.FromURL(f.Url)
+		case *pb.OutFileMessage_LocalPath:
+			if f.LocalPath == "" {
+				return nil, errors.New("Message's file local path is empty or invalid")
+			}
+			content = tb.FromDisk(f.LocalPath)
+		case *pb.OutFileMessage_Data:
+			if len(f.Data) == 0 {
+				return nil, errors.New("Message's file data is empty or invalid")
+			}
+			if len(f.Data) > 20*1024*1024 {
+				return nil, errors.New("Message's file data is too long - maximum size is 20MB")
+			}
+			content = tb.FromReader(bytes.NewReader(f.Data))
+		default:
+			return nil, errors.New("Message's file location is empty or invalid")
+		}
+
+	case *pb.OutMessage_Photo:
+		// Message is a photo
+		if c.Photo == nil || c.Photo.File == nil || c.Photo.File.Location == nil {
+			return nil, errors.New("Message's photo location is empty or invalid")
+		}
+		switch f := c.Photo.File.Location.(type) {
+		case *pb.OutFileMessage_Url:
+			if f.Url == "" {
+				return nil, errors.New("Message's photo URL is empty or invalid")
+			}
+			content = &tb.Photo{File: tb.FromURL(f.Url)}
+		case *pb.OutFileMessage_LocalPath:
+			if f.LocalPath == "" {
+				return nil, errors.New("Message's photo local path is empty or invalid")
+			}
+			content = &tb.Photo{File: tb.FromDisk(f.LocalPath)}
+		case *pb.OutFileMessage_Data:
+			if len(f.Data) == 0 {
+				return nil, errors.New("Message's photo data is empty or invalid")
+			}
+			if len(f.Data) > 20*1024*1024 {
+				return nil, errors.New("Message's photo data is too long - maximum size is 20MB")
+			}
+			content = &tb.Photo{File: tb.FromReader(bytes.NewReader(f.Data))}
+		default:
+			return nil, errors.New("Message's photo location is empty or invalid")
+		}
+	default:
+		// Message's type is empty or invalid, so return
+		return nil, errors.New("Message's content is empty or invalid")
+	}
+
+	// Send the message
+	sent, err := b.bot.Send(recipient, content, opts)
 	if err != nil {
-		b.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())
-		return
+		return nil, err
 	}
 
-	// Send photo, if any
-	// Note that this might fail, for example if the image is too big (>5MB)
-	if msg.Post.Photo != "" {
-		_, err = b.bot.Send(
-			recipient,
-			&tb.Photo{File: tb.FromURL(msg.Post.Photo)},
-			&tb.SendOptions{
-				// Do not send notifications for subsequent messages
-				DisableNotification: true,
+	// Get the ID of the message that was sent
+	res := &pb.SentMessage{
+		MessageId: int64(sent.ID),
+		ChatId:    sent.Chat.ID,
+	}
+
+	return res, nil
+}
+
+// EditTextMessage requests an edit to a text message that was sent before
+func (b *BotManager) EditTextMessage(edit *pb.EditTextMessage) error {
+	// Message signature
+	msg := msgEditable{
+		MessageId: strconv.FormatInt(edit.Message.MessageId, 10),
+		ChatId:    edit.Message.ChatId,
+	}
+
+	// Send options
+	opts := &tb.SendOptions{}
+	if edit.DisableWebPagePreview {
+		opts.DisableWebPagePreview = true
+	}
+
+	// Content
+	if edit.Text == nil || edit.Text.Text == "" {
+		return errors.New("Message's text content is empty")
+	}
+	content := edit.Text.Text
+
+	// Set parse mode, if needed
+	switch edit.Text.ParseMode {
+	case pb.ParseMode_HTML:
+		opts.ParseMode = tb.ModeHTML
+	case pb.ParseMode_MARKDOWN:
+		opts.ParseMode = tb.ModeMarkdown
+	case pb.ParseMode_MARKDOWN_V2:
+		opts.ParseMode = tb.ModeMarkdownV2
+	}
+
+	// Request the edit
+	_, err := b.bot.Edit(msg, content, opts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// AddRoute adds a route for text messages
+func (b *BotManager) AddRoute(route string, cb RouteCallback) error {
+	if len(route) < 1 {
+		return errors.New("Route is empty or invalid")
+	}
+	if cb == nil {
+		return errors.New("Callback is empty")
+	}
+
+	// Create a regular expression from the route
+	exp, err := regexp.Compile(route)
+	if err != nil {
+		return fmt.Errorf("Could not compile route's regular expression: %s", err)
+	}
+
+	// Add the route to the list
+	b.routes = append(b.routes, routeDefinition{
+		Path:     route,
+		Match:    exp,
+		Callback: cb,
+	})
+
+	return nil
+}
+
+// Adds the core routes
+func (b *BotManager) addCoreRoutes() {
+	b.routes = []routeDefinition{
+		// Say hi!
+		{
+			Match: regexp.MustCompile("(?i)^(hi|hello|hey)([[:punct:]]|\\s)*(there|bot)?"),
+			Callback: func(mp *pb.InMessage) {
+				_, err := b.RespondToCommand(mp, "👋 Hey there! What can I do for you? ")
+				if err != nil {
+					// Log errors only
+					b.log.Printf("Error sending message to chat %d: %s\n", mp.ChatId, err.Error())
+				}
 			},
-		)
-		if err != nil {
-			b.log.Printf("Error sending photo %s to chat %d: %s\n", msg.Post.Photo, msg.ChatId, err.Error())
+		},
+		// Add a route for help messages
+		{
+			Match: regexp.MustCompile("(?i)^help"),
+			Callback: func(m *pb.InMessage) {
+				b.helpMessageCallback(m)
+			},
+		},
+	}
+}
+
+// Sends the help message
+func (b *BotManager) helpMessageCallback(m *pb.InMessage) {
+	b.RespondToCommand(m, "Here's where I'll write the help message 🤔")
+}
+
+// Finds a route matching the message, if any
+func (b *BotManager) matchRoute(m *tb.Message) RouteCallback {
+	// Iterate through all routes until we find a matching one
+	for _, r := range b.routes {
+		if r.Match.MatchString(m.Text) {
+			return r.Callback
 		}
 	}
+
+	return nil
 }
 
-// Formats a message with an update
-func (b *RSSBot) formatUpdateMessage(msg *feeds.UpdateMessage) string {
-	// Note: the msg.Feed object might be nil when passed to this method
-	out := ""
-	if msg.Feed != nil {
-		out += fmt.Sprintf("🎙 %s:\n", b.escapeHTMLEntities(msg.Feed.Title))
-	}
-
-	// Add the content
-	out += fmt.Sprintf("📬 <b>%s</b>\n🕓 %s\n🔗 %s\n",
-		b.escapeHTMLEntities(msg.Post.Title),
-		b.escapeHTMLEntities(msg.Post.Date.UTC().Format("Mon, 02 Jan 2006 15:04:05 MST")),
-		b.escapeHTMLEntities(msg.Post.Link),
-	)
-	return out
-}
-
-// Sends a response to a command
+// RespondToCommand sends a response to a command
 // For commands sent in private chats, this just sends a regular message
 // In groups, this replies to a specific message
-func (b *RSSBot) respondToCommand(m *tb.Message, msg interface{}, options ...interface{}) (out *tb.Message, err error) {
-	// If it's a private chat, send a message, otherwise reply
-	if m.Private() {
-		out, err = b.bot.Send(m.Sender, msg, options...)
-	} else {
-		out, err = b.bot.Reply(m, msg, options...)
+func (b *BotManager) RespondToCommand(in *pb.InMessage, content interface{}) (*pb.SentMessage, error) {
+	// Message to send
+	out := &pb.OutMessage{
+		Recipient: strconv.FormatInt(in.ChatId, 10),
 	}
 
-	// Log errors
-	if err != nil {
-		b.log.Printf("Error sending message to chat %d: %s\n", m.Chat.ID, err.Error())
+	// Content
+	switch c := content.(type) {
+	case *pb.OutMessage_Text:
+	case *pb.OutMessage_File:
+	case *pb.OutMessage_Photo:
+		// Already in the right format
+		out.Content = c
+	case *pb.OutTextMessage:
+		// Text message
+		out.Content = &pb.OutMessage_Text{
+			Text: c,
+		}
+	case *pb.OutFileMessage:
+		// File
+		out.Content = &pb.OutMessage_File{
+			File: c,
+		}
+	case *pb.OutPhotoMessage:
+		// Photo
+		out.Content = &pb.OutMessage_Photo{
+			Photo: c,
+		}
+	case string:
+		// String
+		out.Content = &pb.OutMessage_Text{
+			Text: &pb.OutTextMessage{
+				Text: c,
+			},
+		}
+	default:
+		return nil, errors.New("Invalid content argument")
 	}
 
-	return
+	// If it's a private chat, send as a regular message, otherwise reply
+	out.ReplyTo = 0
+	if !in.Private {
+		out.ReplyTo = in.MessageId
+	}
+
+	// Send the message
+	return b.SendMessage(out)
 }
 
-// Register all command handlers
-func (b *RSSBot) registerCommands() (err error) {
-	// Register handlers
-	b.bot.Handle("/start", b.handleStart)
-	b.bot.Handle("/help", b.handleHelp)
-	b.bot.Handle("/add", b.handleAdd)
-	b.bot.Handle("/list", b.handleList)
-	b.bot.Handle("/remove", b.handleRemove)
-
-	// Handler for callbacks
-	b.bot.Handle(tb.OnCallback, func(cb *tb.Callback) {
-		// Seems that we need to trim whitespaces from the data
-		data := strings.TrimSpace(cb.Data)
-		// The main command comes before the /
-		pos := strings.Index(data, "/")
-		cmd := data
-		var userData string
-		if pos > -1 {
-			cmd = data[0:pos]
-			userData = data[(pos + 1):]
+// Registers the functions that handle all messages
+func (b *BotManager) handleMessages() {
+	// Handle the /start message
+	b.bot.Handle("/start", func(m *tb.Message) {
+		mp := messageToProto(m)
+		_, err := b.RespondToCommand(mp, "👋 Nice to meet you!")
+		if err != nil {
+			// Log errors only
+			b.log.Printf("Error sending message to chat %d: %s\n", mp.ChatId, err.Error())
 		}
-
-		switch cmd {
-		// Cancel command removes all inline keyboards
-		case "cancel":
-			_, err := b.bot.Edit(cb.Message, "Ok, I won't do anything")
-			if err != nil {
-				b.log.Printf("Error canceling callback: %s\n", err.Error())
-			}
-
-		// Confirm removing a feed
-		case "confirm-remove":
-			b.callbackConfirmRemove(cb, userData)
-		}
+		b.helpMessageCallback(mp)
 	})
 
-	// Set commands for Telegram
-	err = b.bot.SetCommands([]tb.Command{
-		{Text: "add", Description: "Subscribe to a new feed"},
-		{Text: "list", Description: "List subscriptions for this chat"},
-		{Text: "remove", Description: "Unsubscribe from a feed"},
-		{Text: "help", Description: "Show help message"},
+	// Handle the /help message
+	b.bot.Handle("/help", func(m *tb.Message) {
+		mp := messageToProto(m)
+		b.helpMessageCallback(mp)
 	})
-	return err
+
+	// Add core routes for text messages
+	b.addCoreRoutes()
+
+	// Handle text messages that weren't captured by other handlers
+	b.bot.Handle(tb.OnText, func(m *tb.Message) {
+		// Trim whitespaces
+		m.Text = strings.TrimSpace(m.Text)
+
+		// Convert to the proto model
+		mp := messageToProto(m)
+
+		// Look for a matching route
+		cb := b.matchRoute(m)
+		if cb != nil {
+			cb(mp)
+			return
+		}
+
+		// Explain you didn't get that
+		_, err := b.RespondToCommand(mp, "Sorry, I didn't quite get that 😔 Ask me \"help\" if you need directions.")
+		if err != nil {
+			// Log errors only
+			b.log.Printf("Error sending message to chat %d: %s\n", mp.ChatId, err.Error())
+		}
+	})
 }
 
 // Returns the list of allowed users (if any)
 // Returns a map so lookups are faster
-func (b *RSSBot) getAllowedUsers() (allowedUsers map[int]bool) {
+func (b *BotManager) getAllowedUsers() (allowedUsers map[int]bool) {
 	// Check if we can get an int slice
 	uids := viper.GetIntSlice("AllowedUsers")
 	if len(uids) == 0 {
@@ -299,4 +442,73 @@ func (b *RSSBot) getAllowedUsers() (allowedUsers map[int]bool) {
 		}
 	}
 	return
+}
+
+// Returns the poller middleware that only allows messages from users in the allowlist
+func (b *BotManager) allowedUsersMiddleware(list map[int]bool) func(u *tb.Update) bool {
+	return func(u *tb.Update) bool {
+		if u.Message == nil {
+			return true
+		}
+
+		// Restrict to certain users only
+		if u.Message.Sender == nil || u.Message.Sender.ID == 0 || !list[u.Message.Sender.ID] {
+			if u.Message.Sender == nil {
+				b.log.Println("Ignoring message from empty sender")
+			} else {
+				b.log.Println("Ignoring message from disallowed sender:", u.Message.Sender.ID)
+			}
+			return false
+		}
+
+		return true
+	}
+}
+
+// Implements the tb.Recipient interface
+type msgRecipient struct {
+	R string
+}
+
+// Recipient returns the recipient of the message
+func (m msgRecipient) Recipient() string {
+	return m.R
+}
+
+// Returns a msgRecipient object from a chatId
+func recipientFromChatId(chatID int64) msgRecipient {
+	return msgRecipient{strconv.FormatInt(chatID, 10)}
+}
+
+// Implements the tb.Editable interface
+type msgEditable struct {
+	MessageId string
+	ChatId    int64
+}
+
+// MessageSig returns the message signature
+func (m msgEditable) MessageSig() (messageID string, chatID int64) {
+	return m.MessageId, m.ChatId
+}
+
+// Converts a message from telebot (tb.Message) into the protobuf model
+func messageToProto(m *tb.Message) *pb.InMessage {
+	return &pb.InMessage{
+		MessageId: int64(m.ID),
+		SenderId:  int64(m.Sender.ID),
+		ChatId:    m.Chat.ID,
+		Time:      timestamppb.New(m.Time()),
+		Private:   m.Private(),
+		Text:      m.Text,
+	}
+}
+
+// RouteCallback is the callback function for a given route
+type RouteCallback func(m *pb.InMessage)
+
+// Internal struct used to maintain a route definition
+type routeDefinition struct {
+	Path     string
+	Match    *regexp.Regexp
+	Callback RouteCallback
 }

@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package bot;
+
+option go_package = "github.com/ItalyPaleAle/rss-bot/proto";
+
+// InMessage is the model for received messages
+message InMessage {
+  // Message ID
+  int64 message_id = 1;
+  
+  // Chat ID
+  int64 chat_id = 2;
+
+  // Sender ID
+  int64 sender_id = 3;
+
+  // Time
+  google.protobuf.Timestamp time = 4;
+
+  // True if message was sent in a private chat (1:1 with the bot); false if it's in a group or channel
+  bool private = 5;
+
+  // Text
+  string text = 10;
+}
+
+// OutMessage is the model for messages that need to be sent
+message OutMessage {
+  // Recipient (chat or user)
+  string recipient = 1;
+
+  // Message to reply to (if any)
+  int64 reply_to = 2;
+
+  // Message could be text or file (and photo, etc)
+  oneof content {
+    OutTextMessage text = 10;
+    OutFileMessage file = 11;
+    OutPhotoMessage photo = 12;
+  }
+
+  // Option: disable notifications
+  bool disable_notification = 21;
+  // Option: disable web page preview
+  bool disable_web_page_preview = 22;
+}
+
+// OutTextMessage is the model for text messages that need to be sent
+message OutTextMessage {
+  // Text of the message
+  string text = 1;
+
+  // How the message should be parsed
+  ParseMode parse_mode = 2;
+}
+
+// OutPhotoMessage is the model for file messages that need to be sent
+message OutFileMessage {
+  // Location of the file
+  oneof location {
+    // Retrieve from a URL on the Internet
+    string url = 1;
+    // Load from the local disk
+    string local_path = 2;
+    // Embedded binary data
+    bytes data = 3;
+  }
+}
+
+// OutPhotoMessage is the model for photo messages that need to be sent
+message OutPhotoMessage {
+  // This "extends" OutFileMessage
+  OutFileMessage file = 1;
+
+  // Size: width
+  int32 width = 2;
+  // Size: height
+  int32 height = 3;
+
+  // Caption
+  string caption = 4;
+  // Caption parse mode
+  ParseMode caption_parse_mode = 5;
+}
+
+// SentMessage contains the IDs of a message that was sent by the methods to send messages
+message SentMessage {
+  // Message ID
+  int64 message_id = 1;
+
+  // Chat ID
+  int64 chat_id = 2;
+}
+
+// EditTextMessage is used to edit a text message that was sent earlier
+message EditTextMessage {
+  // ID of the message that was sent
+  SentMessage message = 1;
+
+  // Content
+  OutTextMessage text = 10;
+
+  // Option: disable web page preview
+  bool disable_web_page_preview = 22;
+}
+
+// ParseMode determines how the message should be parsed
+enum ParseMode {
+  PLAIN = 0;
+  HTML = 1;
+  MARKDOWN = 2;
+  MARKDOWN_V2 = 3;
+}
+
