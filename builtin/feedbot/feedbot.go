@@ -182,6 +182,7 @@ func (fb *FeedBot) formatUpdateMessage(msg *feeds.UpdateMessage) string {
 // Register all routes
 func (fb *FeedBot) registerRoutes() (err error) {
 	fb.manager.AddRoute("(?i)^add feed (.*)", fb.routeAdd)
+	fb.manager.AddRoute("(?i)^list feed(s?)", fb.routeList)
 
 	/*// Handler for callbacks
 	b.bot.Handle(tb.OnCallback, func(cb *tb.Callback) {
