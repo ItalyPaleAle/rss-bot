@@ -11,13 +11,21 @@ func (fb *FeedBot) routeList(m *pb.InMessage) {
 	// Get the list of subscriptions
 	feeds, err := fb.feeds.ListSubscriptions(m.ChatId)
 	if err != nil {
-		fb.manager.RespondToCommand(m, "An internal error occurred")
+		_, err := fb.manager.RespondToCommand(m, "An internal error occurred")
+		if err != nil {
+			// Log errors only
+			fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
+		}
 		return
 	}
 
 	// Build the response
 	if len(feeds) == 0 {
-		fb.manager.RespondToCommand(m, "This chat is not subscribed to any feed")
+		_, err := fb.manager.RespondToCommand(m, "This chat is not subscribed to any feed")
+		if err != nil {
+			// Log errors only
+			fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
+		}
 		return
 	}
 
@@ -25,5 +33,16 @@ func (fb *FeedBot) routeList(m *pb.InMessage) {
 	for i, f := range feeds {
 		out += fmt.Sprintf("%d: %s\n", (i + 1), f.Url)
 	}
-	fb.manager.RespondToCommand(m, out)
+	_, err = fb.manager.RespondToCommand(m, &pb.OutMessage{
+		Content: &pb.OutMessage_Text{
+			Text: &pb.OutTextMessage{
+				Text: out,
+			},
+		},
+		DisableWebPagePreview: true,
+	})
+	if err != nil {
+		// Log errors only
+		fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
+	}
 }

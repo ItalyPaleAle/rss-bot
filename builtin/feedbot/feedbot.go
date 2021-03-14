@@ -160,56 +160,11 @@ func (fb *FeedBot) formatUpdateMessage(msg *feeds.UpdateMessage) string {
 	return out
 }
 
-// Sends a response to a command
-// For commands sent in private chats, this just sends a regular message
-// In groups, this replies to a specific message
-/*func (b *FeedBot) respondToCommand(m *tb.Message, msg interface{}, options ...interface{}) (out *tb.Message, err error) {
-	// If it's a private chat, send a message, otherwise reply
-	if m.Private() {
-		out, err = b.bot.Send(m.Sender, msg, options...)
-	} else {
-		out, err = b.bot.Reply(m, msg, options...)
-	}
-
-	// Log errors
-	if err != nil {
-		b.log.Printf("Error sending message to chat %d: %s\n", m.Chat.ID, err.Error())
-	}
-
-	return
-}*/
-
 // Register all routes
 func (fb *FeedBot) registerRoutes() (err error) {
-	fb.manager.AddRoute("(?i)^add feed (.*)", fb.routeAdd)
+	fb.manager.AddRoute("(?i)^add feed", fb.routeAdd)
 	fb.manager.AddRoute("(?i)^list feed(s?)", fb.routeList)
-
-	/*// Handler for callbacks
-	b.bot.Handle(tb.OnCallback, func(cb *tb.Callback) {
-		// Seems that we need to trim whitespaces from the data
-		data := strings.TrimSpace(cb.Data)
-		// The main command comes before the /
-		pos := strings.Index(data, "/")
-		cmd := data
-		var userData string
-		if pos > -1 {
-			cmd = data[0:pos]
-			userData = data[(pos + 1):]
-		}
-
-		switch cmd {
-		// Cancel command removes all inline keyboards
-		case "cancel":
-			_, err := b.bot.Edit(cb.Message, "Ok, I won't do anything")
-			if err != nil {
-				b.log.Printf("Error canceling callback: %s\n", err.Error())
-			}
-
-		// Confirm removing a feed
-		case "confirm-remove":
-			b.callbackConfirmRemove(cb, userData)
-		}
-	})*/
+	fb.manager.AddRoute("(?i)^remove feed", fb.routeRemove)
 
 	return err
 }

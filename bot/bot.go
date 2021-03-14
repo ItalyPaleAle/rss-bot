@@ -318,12 +318,12 @@ func (b *BotManager) matchRoute(m *tb.Message) RouteCallback {
 // In groups, this replies to a specific message
 func (b *BotManager) RespondToCommand(in *pb.InMessage, content interface{}) (*pb.SentMessage, error) {
 	// Message to send
-	out := &pb.OutMessage{
-		Recipient: strconv.FormatInt(in.ChatId, 10),
-	}
+	out := &pb.OutMessage{}
 
 	// Content
 	switch c := content.(type) {
+	case *pb.OutMessage:
+		out = c
 	case *pb.OutMessage_Text:
 	case *pb.OutMessage_File:
 	case *pb.OutMessage_Photo:
@@ -355,6 +355,9 @@ func (b *BotManager) RespondToCommand(in *pb.InMessage, content interface{}) (*p
 		return nil, errors.New("Invalid content argument")
 	}
 
+	// Set recipient
+	out.Recipient = strconv.FormatInt(in.ChatId, 10)
+
 	// If it's a private chat, send as a regular message, otherwise reply
 	out.ReplyTo = 0
 	if !in.Private {
@@ -365,8 +368,13 @@ func (b *BotManager) RespondToCommand(in *pb.InMessage, content interface{}) (*p
 	return b.SendMessage(out)
 }
 
+var msgCmdMatch = regexp.MustCompile("(?i)^/(msg|message)(@[A-Za-z0-9-_]*)?")
+
 // Registers the functions that handle all messages
 func (b *BotManager) handleMessages() {
+	// Add core routes for text messages
+	b.addCoreRoutes()
+
 	// Handle the /start message
 	b.bot.Handle("/start", func(m *tb.Message) {
 		mp := messageToProto(m)
@@ -384,11 +392,9 @@ func (b *BotManager) handleMessages() {
 		b.helpMessageCallback(mp)
 	})
 
-	// Add core routes for text messages
-	b.addCoreRoutes()
-
-	// Handle text messages that weren't captured by other handlers
-	b.bot.Handle(tb.OnText, func(m *tb.Message) {
+	// Handler for text messages
+	// Used by /message, /msg, and the generic text messages
+	textMessageHandler := func(m *tb.Message) {
 		// Trim whitespaces
 		m.Text = strings.TrimSpace(m.Text)
 
@@ -408,7 +414,35 @@ func (b *BotManager) handleMessages() {
 			// Log errors only
 			b.log.Printf("Error sending message to chat %d: %s\n", mp.ChatId, err.Error())
 		}
+	}
+
+	// Handle the /message and /msg messages that are used to talk to this bot while in groups
+	msgCmdHandle := func(m *tb.Message) {
+		// Trim the /message or /msg prefix
+		match := msgCmdMatch.FindStringSubmatch(m.Text)
+		if len(match) == 0 {
+			b.log.Printf("Received an invalid /message command from chat %d: %s", m.Chat.ID, m.Text)
+		}
+		m.Text = m.Text[len(match[0]):]
+
+		// Handle as text message
+		textMessageHandler(m)
+	}
+	b.bot.Handle("/message", msgCmdHandle)
+	b.bot.Handle("/msg", msgCmdHandle)
+
+	// Handle text messages that weren't captured by other handlers
+	b.bot.Handle(tb.OnText, textMessageHandler)
+
+	// Set commands for Telegram
+	err := b.bot.SetCommands([]tb.Command{
+		{Text: "help", Description: "Show help message"},
+		{Text: "message", Description: "Use in group chats to send messages to the bot"},
 	})
+	if err != nil {
+		// Log errors only
+		b.log.Println("Error while setting commands for Telegram")
+	}
 }
 
 // Returns the list of allowed users (if any)

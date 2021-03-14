@@ -66,7 +66,7 @@ func (f *Feeds) Init(ctx context.Context) (err error) {
 
 // AddSubscription subscribes a chat to a feed, adding the feed if required
 func (f *Feeds) AddSubscription(url string, chatId int64) (*Post, error) {
-	if chatId < 1 {
+	if chatId == 0 {
 		return nil, errors.New("Empty chat ID")
 	}
 

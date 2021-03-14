@@ -41,6 +41,9 @@ func (fb *FeedBot) routeAdd(m *pb.InMessage) {
 				fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
 			}
 		} else {
+			// Log errors and then send a message
+			fb.log.Printf("Error while adding feed to chat %d: %s\n", m.ChatId, err.Error())
+
 			err := fb.manager.EditTextMessage(&pb.EditTextMessage{
 				Message: sent,
 				Text: &pb.OutTextMessage{
