@@ -7,6 +7,7 @@ import (
 
 	"github.com/ItalyPaleAle/rss-bot/bot"
 	"github.com/ItalyPaleAle/rss-bot/builtin/feedbot"
+	"github.com/ItalyPaleAle/rss-bot/builtin/notifybot"
 	"github.com/ItalyPaleAle/rss-bot/db"
 	"github.com/ItalyPaleAle/rss-bot/migrations"
 )
@@ -36,6 +37,18 @@ func main() {
 	{
 		// FeedBot: RSS and Atom feeds
 		feature := &feedbot.FeedBot{}
+		err := feature.Init(b)
+		if err != nil {
+			panic(err)
+		}
+		err = feature.Start()
+		if err != nil {
+			panic(err)
+		}
+	}
+	{
+		// NotifyBot: Webhook notifier
+		feature := &notifybot.NotifyBot{}
 		err := feature.Init(b)
 		if err != nil {
 			panic(err)
