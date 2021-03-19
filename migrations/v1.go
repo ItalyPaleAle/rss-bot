@@ -6,8 +6,8 @@ import (
 
 func V1() error {
 	DB := db.GetDB()
-	sqlStmt := `
-CREATE TABLE IF NOT EXISTS feeds (
+	_, err := DB.Exec(`
+CREATE TABLE feeds (
 	feed_id integer primary key autoincrement,
 	feed_url text not null,
 	feed_last_modified timestamp not null,
@@ -16,21 +16,22 @@ CREATE TABLE IF NOT EXISTS feeds (
 	feed_last_post_link text not null,
 	feed_last_post_date timestamp not null
 );
-CREATE UNIQUE INDEX IF NOT EXISTS feeds_feed_url ON feeds (feed_url);
-CREATE TABLE IF NOT EXISTS subscriptions (
+
+CREATE UNIQUE INDEX feeds_feed_url ON feeds (feed_url);
+
+CREATE TABLE subscriptions (
 	subscription_id integer primary key autoincrement,
 	feed_id integer not null,
 	chat_id integer not null
 );
-CREATE INDEX IF NOT EXISTS subscriptions_chat_id ON subscriptions (chat_id);
-CREATE TABLE IF NOT EXISTS migrations (
-	version integer
-);
-`
 
-	_, err := DB.Exec(sqlStmt)
+CREATE INDEX subscriptions_chat_id ON subscriptions (chat_id);
+
+INSERT INTO migrations (ROWID, version) VALUES (0, 1);
+`)
 	if err != nil {
 		return err
 	}
+	version = 1
 	return nil
 }

@@ -2,28 +2,35 @@ package notifybot
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ItalyPaleAle/rss-bot/bot"
+	"github.com/ItalyPaleAle/rss-bot/db"
+	pb "github.com/ItalyPaleAle/rss-bot/proto"
 )
 
 // TODO: Make env var
-const listen = ":8080"
+const listen = "127.0.0.1:8080"
 
 // Maximum request body size is 4 KB
 const maxBodySize = int64(4 << 10)
 
-// WebhookRequestPayload is the format of requests to the webhook server: we support sending messages in the "message" key only
+// WebhookRequestPayload is the format of requests to the webhook server
+// We require the "message" key with the message to send
+// Optionally, a "markdown" boolean can be set to specify to use markdown for formatting
 type WebhookRequestPayload struct {
-	Message string `json:"message"`
+	Message  string `json:"message"`
+	Markdown bool   `json:"markdown"`
 }
 
 // NotifyBot is the class that manages the Webhook notifier
@@ -93,28 +100,10 @@ func (fb *NotifyBot) Stop() {
 	fb.cancel()
 }
 
-// Internal function used to return a HTTP error (formatted as JSON) in the response
-func responseError(w http.ResponseWriter, errMsg string, statusCode int) {
-	// Headers and status code
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	// Write the response as JSON
-	j := json.NewEncoder(w)
-	_ = j.Encode(struct {
-		Error string `json:"error"`
-	}{
-		Error: errMsg,
-	})
-}
-
 // Handler for the requests received by the server
 func (fb *NotifyBot) requestHandler() http.Handler {
 	// The path must start with /webhook and then contain the recipient ID
 	reqUrlExpr := regexp.MustCompile("^/webhook/([A-Za-z0-9_-]+)$")
-
-	// Matching "Bearer" at the beginning of the access token in the Authorization header
-	bearerExpr := regexp.MustCompile("((?i)^Bearer )?([A-Za-z0-9_-]+)$")
 
 	// Specs: https://github.com/cloudevents/spec/blob/v1.0.1/http-webhook.md
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -122,16 +111,17 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 
 		// Must only respond to POST requests
 		if r.Method != "POST" {
-			responseError(w, "Not found", http.StatusNotFound)
+			responseError(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
 
 		// Match the URL
 		match := reqUrlExpr.FindStringSubmatch(r.URL.Path)
 		if len(match) < 2 || match[1] == "" {
-			responseError(w, "Not found", http.StatusNotFound)
+			responseError(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
+		recipientId := match[1]
 
 		// Get the authorization token, from the "Authorization" header first and then the querystring
 		auth := ""
@@ -151,10 +141,10 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 			}
 		}
 
-		// Validate the auth header
-		// TODO: Use the database to validate tokens. Note: if the recipient ID doesn't exist, return a 401 too just like if the auth token is wrong, to avoid giving away information about recipients
-		if auth == "" {
-			responseError(w, "Invalid authorization", http.StatusUnauthorized)
+		// Validate the authorization for this webhook recipient and get the chat ID
+		chatId, authOk := validateAuth(w, r, recipientId)
+		if !authOk || chatId == 0 {
+			// Response was already sent
 			return
 		}
 
@@ -188,7 +178,27 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 			return
 		}
 
-		fmt.Println(payload.Message, auth)
+		// Send the message in a background goroutine (so we're not pausing the response)
+		go func() {
+			// Markdown formatting
+			parseMode := pb.ParseMode_PLAIN
+			if payload.Markdown {
+				parseMode = pb.ParseMode_MARKDOWN_V2
+			}
+
+			_, err := fb.manager.SendMessage(&pb.OutMessage{
+				Recipient: strconv.FormatInt(chatId, 10),
+				Content: &pb.OutMessage_Text{
+					Text: &pb.OutTextMessage{
+						Text:      payload.Message,
+						ParseMode: parseMode,
+					},
+				},
+			})
+			if err != nil {
+				fb.log.Println("Error while sending the notification", err)
+			}
+		}()
 
 		// Respond with an "Accepted" (202) status code
 		w.WriteHeader(http.StatusAccepted)
@@ -202,4 +212,62 @@ func (fb *NotifyBot) registerRoutes() (err error) {
 	fb.manager.AddRoute("(?i)^remove feed", fb.routeRemove)*/
 
 	return nil
+}
+
+// Internal function used to return a HTTP error (formatted as JSON) in the response
+func responseError(w http.ResponseWriter, errMsg string, statusCode int) {
+	// Headers and status code
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	// Write the response as JSON
+	j := json.NewEncoder(w)
+	_ = j.Encode(struct {
+		Error string `json:"error"`
+	}{
+		Error: errMsg,
+	})
+}
+
+// Matching "Bearer" at the beginning of the access token in the Authorization header
+var bearerExpr = regexp.MustCompile("((?i)^Bearer )?([A-Za-z0-9_-]+)$")
+
+// Internal function used to validate authorization to use the webhook
+func validateAuth(w http.ResponseWriter, r *http.Request, recipientId string) (chatId int64, ok bool) {
+	// Get the auth token, from the "Authorization" header first and then the querystring
+	auth := ""
+	if a := r.Header.Get("authorization"); a != "" {
+		// Match with the "Bearer" optional prefix
+		match := bearerExpr.FindStringSubmatch(a)
+		if len(match) == 2 && len(match[2]) != 0 {
+			auth = match[2]
+		}
+	}
+	if auth == "" {
+		query := r.URL.Query()
+		if query != nil {
+			if a := query.Get("access_token"); a != "" {
+				auth = a
+			}
+		}
+	}
+
+	// Validate the auth token
+	DB := db.GetDB()
+	if auth == "" {
+		responseError(w, "Invalid authorization", http.StatusUnauthorized)
+		return 0, false
+	}
+	authHash := sha256.Sum256([]byte(auth))
+	webhook := &db.Webhook{}
+	err := DB.Get(webhook, "SELECT * FROM webhooks WHERE webhook_id = ? AND webhook_key = ?", recipientId, authHash[:])
+	if err == sql.ErrNoRows || webhook.ChatID == 0 {
+		responseError(w, "Invalid authorization", http.StatusUnauthorized)
+		return 0, false
+	} else if err != nil {
+		responseError(w, "Internal error", http.StatusInternalServerError)
+		return 0, false
+	}
+
+	return webhook.ChatID, true
 }
