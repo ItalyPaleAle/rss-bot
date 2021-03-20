@@ -21,7 +21,7 @@ func (fb *FeedBot) routeList(m *pb.InMessage) {
 
 	// Build the response
 	if len(feeds) == 0 {
-		_, err := fb.manager.RespondToCommand(m, "This chat is not subscribed to any feed")
+		_, err := fb.manager.RespondToCommand(m, "I can't find any feed this chat is subscribed to")
 		if err != nil {
 			// Log errors only
 			fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())

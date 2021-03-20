@@ -6,6 +6,7 @@ require (
 	github.com/Songmu/go-httpdate v1.0.0
 	github.com/golang/protobuf v1.4.1
 	github.com/jmoiron/sqlx v1.3.1
+	github.com/matoous/go-nanoid/v2 v2.0.0
 	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/mmcdole/gofeed v1.1.0
 	github.com/otiai10/opengraph/v2 v2.0.2

@@ -25,12 +25,13 @@ const listen = "127.0.0.1:8080"
 // Maximum request body size is 4 KB
 const maxBodySize = int64(4 << 10)
 
-// WebhookRequestPayload is the format of requests to the webhook server
+// WebhookRequestPayload is the format of requests to the webhook server when using JSON
 // We require the "message" key with the message to send
-// Optionally, a "markdown" boolean can be set to specify to use markdown for formatting
+// Optionally, a "markdown" and "html" booleans can be set to use markdown or HTML for formatting
 type WebhookRequestPayload struct {
 	Message  string `json:"message"`
 	Markdown bool   `json:"markdown"`
+	HTML     bool   `json:"html"`
 }
 
 // NotifyBot is the class that manages the Webhook notifier
@@ -56,6 +57,12 @@ func (nb *NotifyBot) Init(manager *bot.BotManager) error {
 func (nb *NotifyBot) Start() error {
 	// Context, that can be used to stop the web server (and the bot)
 	nb.ctx, nb.cancel = context.WithCancel(context.Background())
+
+	// Register all commands
+	err := nb.registerRoutes()
+	if err != nil {
+		return err
+	}
 
 	// Create the HTTP server
 	srv := &http.Server{
@@ -84,24 +91,27 @@ func (nb *NotifyBot) Start() error {
 		}
 	}()
 
-	// Start the server
-	nb.log.Println("Starting the web server on, listening on", listen)
-	// This call blocks until the server is shut down
-	err := srv.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
-		return err
-	}
+	// Start the server in a separate goroutine so we don't block the main thread
+	go func() {
+		nb.log.Println("Starting the web server on, listening on", listen)
+		// This call blocks until the server is shut down
+		err = srv.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			nb.log.Fatal("Could not start the server", err)
+			return
+		}
+	}()
 
 	return nil
 }
 
 // Stop the background processes
-func (fb *NotifyBot) Stop() {
-	fb.cancel()
+func (nb *NotifyBot) Stop() {
+	nb.cancel()
 }
 
 // Handler for the requests received by the server
-func (fb *NotifyBot) requestHandler() http.Handler {
+func (nb *NotifyBot) requestHandler() http.Handler {
 	// The path must start with /webhook and then contain the recipient ID
 	reqUrlExpr := regexp.MustCompile("^/webhook/([A-Za-z0-9_-]+)$")
 
@@ -160,14 +170,14 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 		// Parse the content as JSON
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			fb.log.Println("Error while reading request body", err)
+			nb.log.Println("Error while reading request body", err)
 			responseError(w, "The request body could not be read", http.StatusUnsupportedMediaType)
 			return
 		}
 		payload := &WebhookRequestPayload{}
 		err = json.Unmarshal(body, payload)
 		if err != nil {
-			fb.log.Println("Error while parsing request body", err)
+			nb.log.Println("Error while parsing request body", err)
 			responseError(w, "The request body could not be parsed as JSON", http.StatusUnsupportedMediaType)
 			return
 		}
@@ -180,13 +190,15 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 
 		// Send the message in a background goroutine (so we're not pausing the response)
 		go func() {
-			// Markdown formatting
+			// Markdown or HTML formatting
 			parseMode := pb.ParseMode_PLAIN
-			if payload.Markdown {
+			if payload.HTML {
+				parseMode = pb.ParseMode_HTML
+			} else if payload.Markdown {
 				parseMode = pb.ParseMode_MARKDOWN_V2
 			}
 
-			_, err := fb.manager.SendMessage(&pb.OutMessage{
+			_, err := nb.manager.SendMessage(&pb.OutMessage{
 				Recipient: strconv.FormatInt(chatId, 10),
 				Content: &pb.OutMessage_Text{
 					Text: &pb.OutTextMessage{
@@ -196,7 +208,7 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 				},
 			})
 			if err != nil {
-				fb.log.Println("Error while sending the notification", err)
+				nb.log.Println("Error while sending the notification", err)
 			}
 		}()
 
@@ -206,10 +218,15 @@ func (fb *NotifyBot) requestHandler() http.Handler {
 }
 
 // Register all routes
-func (fb *NotifyBot) registerRoutes() (err error) {
-	/*fb.manager.AddRoute("(?i)^add feed", fb.routeAdd)
-	fb.manager.AddRoute("(?i)^list feed(s?)", fb.routeList)
-	fb.manager.AddRoute("(?i)^remove feed", fb.routeRemove)*/
+func (nb *NotifyBot) registerRoutes() (err error) {
+	err = nb.manager.AddRoute("(?i)^(new|add) webhook", nb.routeNew)
+	if err != nil {
+		return err
+	}
+	err = nb.manager.AddRoute("(?i)^list webhook(s?)", nb.routeList)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

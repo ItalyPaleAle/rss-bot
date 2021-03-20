@@ -111,7 +111,7 @@ func (f *Feeds) AddSubscription(url string, chatId int64) (*Post, error) {
 	// Add the subscription
 	_, err = tx.Exec("INSERT INTO subscriptions (feed_id, chat_id) VALUES (?, ?)", feed.ID, chatId)
 	if err != nil {
-		f.log.Println("Error querying the database:", err)
+		f.log.Println("Error inserting in the database:", err)
 		return nil, err
 	}
 
