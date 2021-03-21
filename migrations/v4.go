@@ -10,10 +10,12 @@ func V4() error {
 CREATE TABLE webhooks (
 	webhook_id text not null,
 	webhook_key blob not null,
+	webhook_created integer not null,
 	chat_id integer not null
 );
 
 CREATE UNIQUE INDEX webhooks_webhook_id ON webhooks (webhook_id);
+CREATE INDEX webhooks_webhook_created ON webhooks (webhook_created);
 
 UPDATE migrations SET version = 4 WHERE ROWID = 0;
 `)

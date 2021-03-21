@@ -170,7 +170,7 @@ func (fb *FeedBot) registerRoutes() (err error) {
 	if err != nil {
 		return err
 	}
-	err = fb.manager.AddRoute("(?i)^remove feed", fb.routeRemove)
+	err = fb.manager.AddRoute("(?i)^(remove|delete) feed", fb.routeRemove)
 	if err != nil {
 		return err
 	}

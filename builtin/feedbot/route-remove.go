@@ -7,13 +7,13 @@ import (
 	pb "github.com/ItalyPaleAle/rss-bot/proto"
 )
 
-var routeRemoveMatch = regexp.MustCompile("(?i)^remove feed (.*)")
+var routeRemoveMatch = regexp.MustCompile("(?i)^(remove|delete) feed (.*)")
 
-// Route for the "list feed(s)" command
+// Route for the "remove feed" command
 func (fb *FeedBot) routeRemove(m *pb.InMessage) {
 	// Get the arg
 	match := routeRemoveMatch.FindStringSubmatch(m.Text)
-	if len(match) < 2 {
+	if len(match) < 3 {
 		_, err := fb.manager.RespondToCommand(m, "I didn't understand this \"remove feed\" message - is the feed ID or URL missing?")
 		if err != nil {
 			// Log errors only
@@ -34,12 +34,12 @@ func (fb *FeedBot) routeRemove(m *pb.InMessage) {
 	}
 
 	// Check if we have an ID or a feed URL
-	feedIdx, err := strconv.ParseInt(match[1], 10, 64)
+	feedIdx, err := strconv.ParseInt(match[2], 10, 64)
 	if err != nil || feedIdx <= 0 || feedIdx > int64(len(feeds)) {
 		// We might have a feed URL
 		feedIdx = -1
 		for i, v := range feeds {
-			if v.Url == match[1] {
+			if v.Url == match[2] {
 				feedIdx = int64(i)
 				break
 			}
@@ -81,5 +81,6 @@ func (fb *FeedBot) routeRemove(m *pb.InMessage) {
 	if err != nil {
 		// Log errors only
 		fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
+		return
 	}
 }

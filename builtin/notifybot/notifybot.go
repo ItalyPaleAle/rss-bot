@@ -227,6 +227,10 @@ func (nb *NotifyBot) registerRoutes() (err error) {
 	if err != nil {
 		return err
 	}
+	err = nb.manager.AddRoute("(?i)^(remove|delete) webhook", nb.routeRemove)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -2,6 +2,7 @@ package notifybot
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
 	pb "github.com/ItalyPaleAle/rss-bot/proto"
@@ -12,7 +13,7 @@ func (nb *NotifyBot) routeList(m *pb.InMessage) {
 	// Get the webhooks from the database
 	DB := db.GetDB()
 	list := []db.Webhook{}
-	err := DB.Select(&list, "SELECT * FROM webhooks WHERE chat_id = ?", m.ChatId)
+	err := DB.Select(&list, "SELECT * FROM webhooks WHERE chat_id = ? ORDER BY webhook_created ASC", m.ChatId)
 	if err != nil {
 		nb.log.Printf("Error retrieving webhooks for chat %d: %s\n", m.ChatId, err.Error())
 		return
@@ -30,7 +31,12 @@ func (nb *NotifyBot) routeList(m *pb.InMessage) {
 
 	out := "Here's the list of webhooks for this chat:\n"
 	for i, v := range list {
-		out += fmt.Sprintf("%d: <code>%s</code>\n", (i + 1), v.ID)
+		created := ""
+		if v.Created > 0 {
+			createdTime := time.Unix(v.Created, 0)
+			created = " (created " + createdTime.Format("2006-01-02") + ")"
+		}
+		out += fmt.Sprintf("%d: <code>%s</code>%s\n", (i + 1), v.ID, created)
 	}
 	_, err = nb.manager.RespondToCommand(m, &pb.OutMessage{
 		Content: &pb.OutMessage_Text{

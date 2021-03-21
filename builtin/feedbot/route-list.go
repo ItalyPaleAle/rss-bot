@@ -31,12 +31,13 @@ func (fb *FeedBot) routeList(m *pb.InMessage) {
 
 	out := "Here's the list of feeds this chat is subscribed to:\n"
 	for i, f := range feeds {
-		out += fmt.Sprintf("%d: %s\n", (i + 1), f.Url)
+		out += fmt.Sprintf("%d: <code>%s</code>\n", (i + 1), f.Url)
 	}
 	_, err = fb.manager.RespondToCommand(m, &pb.OutMessage{
 		Content: &pb.OutMessage_Text{
 			Text: &pb.OutTextMessage{
-				Text: out,
+				Text:      out,
+				ParseMode: pb.ParseMode_HTML,
 			},
 		},
 		DisableWebPagePreview: true,

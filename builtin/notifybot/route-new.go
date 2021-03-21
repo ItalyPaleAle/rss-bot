@@ -2,15 +2,40 @@ package notifybot
 
 import (
 	"crypto/sha256"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	nanoid "github.com/matoous/go-nanoid/v2"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
 	pb "github.com/ItalyPaleAle/rss-bot/proto"
-
-	nanoid "github.com/matoous/go-nanoid/v2"
 )
+
+// Maximum number of webhooks per each chat
+const MaxWebhooksPerChat = 10
 
 // Route for the "new webhook" command
 func (nb *NotifyBot) routeNew(m *pb.InMessage) {
+	DB := db.GetDB()
+
+	// Count how many webhooks this chat is subscribed to, and limit that to MaxWebhooksPerChat
+	count := struct {
+		Count int64 `db:"count"`
+	}{}
+	err := sqlx.Get(DB, &count, "SELECT COUNT(webhook_id) AS count FROM webhooks WHERE chat_id = ?", m.ChatId)
+	if err != nil {
+		nb.log.Printf("Error counting webhooks for chat %d: %s\n", m.ChatId, err.Error())
+		return
+	}
+	if count.Count >= MaxWebhooksPerChat {
+		_, err = nb.manager.RespondToCommand(m, "Sorry, this chat has already reached the maximum number of webhooks and I can't add another one")
+		if err != nil {
+			nb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
+			return
+		}
+		return
+	}
+
 	// Create a new webhook ID and secret
 	webhookId, err := nanoid.New(21)
 	if err != nil {
@@ -29,8 +54,7 @@ func (nb *NotifyBot) routeNew(m *pb.InMessage) {
 	webhookKeyHash := sha256.Sum256([]byte(webhookKey))
 
 	// Insert in the database
-	DB := db.GetDB()
-	_, err = DB.Exec("INSERT INTO webhooks (webhook_id, webhook_key, chat_id) VALUES (?, ?, ?)", webhookId, webhookKeyHash[:], m.ChatId)
+	_, err = DB.Exec("INSERT INTO webhooks (webhook_id, webhook_key, webhook_created, chat_id) VALUES (?, ?, ?, ?)", webhookId, webhookKeyHash[:], time.Now().Unix(), m.ChatId)
 	if err != nil {
 		nb.log.Printf("Error storing new webhook for chat %d: %s\n", m.ChatId, err.Error())
 		return
@@ -39,10 +63,12 @@ func (nb *NotifyBot) routeNew(m *pb.InMessage) {
 	// Respond with the key
 	// TODO: Write full URL
 	_, err = nb.manager.RespondToCommand(m, &pb.OutTextMessage{
-		Text:      "Here's the webhook I've created for you:\nID: `" + webhookId + "`\nURL: `https://localhost:8080/webhook/" + webhookId + "`\nAccess token: `" + webhookKey + "`",
-		ParseMode: pb.ParseMode_MARKDOWN_V2,
-	},
-	)
+		Text: `Here's the webhook I've created for you:
+ID: <code>` + webhookId + `</code>
+URL: <code>https://localhost:8080/webhook/` + webhookId + `</code>
+Access token: <code>` + webhookKey + `</code>`,
+		ParseMode: pb.ParseMode_HTML,
+	})
 	if err != nil {
 		nb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
 		return
