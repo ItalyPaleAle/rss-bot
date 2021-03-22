@@ -133,24 +133,6 @@ func (nb *NotifyBot) requestHandler() http.Handler {
 		}
 		recipientId := match[1]
 
-		// Get the authorization token, from the "Authorization" header first and then the querystring
-		auth := ""
-		if a := r.Header.Get("authorization"); a != "" {
-			// Match with the "Bearer" optional prefix
-			match := bearerExpr.FindStringSubmatch(a)
-			if len(match) == 2 && len(match[2]) != 0 {
-				auth = match[2]
-			}
-		}
-		if auth == "" {
-			query := r.URL.Query()
-			if query != nil {
-				if a := query.Get("access_token"); a != "" {
-					auth = a
-				}
-			}
-		}
-
 		// Validate the authorization for this webhook recipient and get the chat ID
 		chatId, authOk := validateAuth(w, r, recipientId)
 		if !authOk || chatId == 0 {
@@ -158,51 +140,69 @@ func (nb *NotifyBot) requestHandler() http.Handler {
 			return
 		}
 
-		// We only accept requests with data in JSON for now
-		if !strings.HasPrefix(r.Header.Get("content-type"), "application/json") {
-			responseError(w, "This webhook accepts requests in JSON format only", http.StatusUnsupportedMediaType)
-			return
-		}
-
 		// Limit reading to the maximum request body
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
-		// Parse the content as JSON
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			nb.log.Println("Error while reading request body", err)
-			responseError(w, "The request body could not be read", http.StatusUnsupportedMediaType)
-			return
-		}
-		payload := &WebhookRequestPayload{}
-		err = json.Unmarshal(body, payload)
-		if err != nil {
-			nb.log.Println("Error while parsing request body", err)
-			responseError(w, "The request body could not be parsed as JSON", http.StatusUnsupportedMediaType)
-			return
-		}
+		// Handle request depending on Content-Type
+		ct := r.Header.Get("content-type")
+		parseMode := pb.ParseMode_PLAIN
+		var message string
+		switch {
+		// Plain-text request
+		case strings.HasPrefix(ct, "text/plain"):
+			// Read the entire body
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				nb.log.Println("Error while reading request body", err)
+				responseError(w, "The request body could not be read", http.StatusUnsupportedMediaType)
+				return
+			}
+			if len(body) == 0 || int64(len(body)) > maxBodySize {
+				nb.log.Println("Invalid body length", len(body))
+				responseError(w, "The request body is empty", http.StatusUnsupportedMediaType)
+				return
+			}
+			message = string(body)
 
-		// Ensure the message key was present in the request payload
-		if payload.Message == "" {
-			responseError(w, "The key 'message' was missing in the request", http.StatusUnsupportedMediaType)
-			return
-		}
+		// JSON request
+		case strings.HasPrefix(ct, "application/json"):
+			// Parse the content as JSON
+			decoder := json.NewDecoder(r.Body)
+			payload := &WebhookRequestPayload{}
+			err := decoder.Decode(payload)
+			if err != nil {
+				nb.log.Println("Error while parsing request body", err)
+				responseError(w, "The request body could not be parsed as JSON", http.StatusUnsupportedMediaType)
+				return
+			}
 
-		// Send the message in a background goroutine (so we're not pausing the response)
-		go func() {
+			// Ensure the message key was present in the request payload
+			if payload.Message == "" {
+				responseError(w, "The key 'message' was missing in the request", http.StatusUnsupportedMediaType)
+				return
+			}
+			message = payload.Message
+
 			// Markdown or HTML formatting
-			parseMode := pb.ParseMode_PLAIN
 			if payload.HTML {
 				parseMode = pb.ParseMode_HTML
 			} else if payload.Markdown {
 				parseMode = pb.ParseMode_MARKDOWN_V2
 			}
 
+		// We only accept requests with data in JSON or plain text for now
+		default:
+			responseError(w, "This webhook accepts requests in plain text (text/plain) or JSON (application/json) formats only", http.StatusUnsupportedMediaType)
+			return
+		}
+
+		// Send the message in a background goroutine (so we're not pausing the response)
+		go func() {
 			_, err := nb.manager.SendMessage(&pb.OutMessage{
 				Recipient: strconv.FormatInt(chatId, 10),
 				Content: &pb.OutMessage_Text{
 					Text: &pb.OutTextMessage{
-						Text:      payload.Message,
+						Text:      message,
 						ParseMode: parseMode,
 					},
 				},
@@ -260,7 +260,7 @@ func validateAuth(w http.ResponseWriter, r *http.Request, recipientId string) (c
 	if a := r.Header.Get("authorization"); a != "" {
 		// Match with the "Bearer" optional prefix
 		match := bearerExpr.FindStringSubmatch(a)
-		if len(match) == 2 && len(match[2]) != 0 {
+		if len(match) == 3 && len(match[2]) != 0 {
 			auth = match[2]
 		}
 	}
