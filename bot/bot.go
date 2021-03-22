@@ -189,6 +189,32 @@ func (b *BotManager) SendMessage(msg *pb.OutMessage) (*pb.SentMessage, error) {
 		default:
 			return nil, errors.New("Message's photo location is empty or invalid")
 		}
+
+		if c.Photo.Caption != "" {
+			contentPhoto := content.(*tb.Photo)
+			contentPhoto.Caption = c.Photo.Caption
+			// Set parse mode, if needed
+			// Currently commented-out until https://github.com/tucnak/telebot/pull/379 is merged
+			// Instead, setting the value in the opts flag for now
+			/*switch c.Photo.CaptionParseMode {
+			case pb.ParseMode_HTML:
+				contentPhoto.ParseMode = tb.ModeHTML
+			case pb.ParseMode_MARKDOWN:
+				contentPhoto.ParseMode = tb.ModeMarkdown
+			case pb.ParseMode_MARKDOWN_V2:
+				contentPhoto.ParseMode = tb.ModeMarkdownV2
+			default:
+				contentPhoto.ParseMode = tb.ModeDefault
+			}*/
+			switch c.Photo.CaptionParseMode {
+			case pb.ParseMode_HTML:
+				opts.ParseMode = tb.ModeHTML
+			case pb.ParseMode_MARKDOWN:
+				opts.ParseMode = tb.ModeMarkdown
+			case pb.ParseMode_MARKDOWN_V2:
+				opts.ParseMode = tb.ModeMarkdownV2
+			}
+		}
 	default:
 		// Message's type is empty or invalid, so return
 		return nil, errors.New("Message's content is empty or invalid")

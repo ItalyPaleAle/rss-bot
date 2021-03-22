@@ -103,7 +103,43 @@ func (fb *FeedBot) backgroundWorker() {
 
 // Sends a message with a feed's post
 func (fb *FeedBot) sendFeedUpdate(msg *feeds.UpdateMessage) {
-	// Send the post
+	// If there's a photo, send the photo and then the message as caption
+	// Note that this might fail, for example if the image is too big (>5MB)
+	if msg.Post.Photo != "" {
+		_, err := fb.manager.SendMessage(&pb.OutMessage{
+			Recipient: strconv.FormatInt(int64(msg.ChatId), 10),
+			Content: &pb.OutMessage_Photo{
+				Photo: &pb.OutPhotoMessage{
+					File: &pb.OutFileMessage{
+						Location: &pb.OutFileMessage_Url{
+							Url: msg.Post.Photo,
+						},
+					},
+					Caption:          fb.formatUpdateMessage(msg),
+					CaptionParseMode: pb.ParseMode_HTML,
+				},
+			},
+			DisableWebPagePreview: true,
+		})
+		if err != nil {
+			// If this failed with error "wrong file identifier/HTTP URL specified", it means that the photo filed to send, for example because it was > 5MB
+			// So, just re-send the message without any photo
+			if err.Error() == "telegram: wrong file identifier/HTTP URL specified (400)" {
+				fb.log.Printf("Error sending photo %s to chat %d. Is the photo too big? Will re-send message without photo: %s\n", msg.Post.Photo, msg.ChatId, err.Error())
+				fb.sendFeedUpdateText(msg)
+			} else {
+				// Just log the error and continue
+				fb.log.Printf("Error sending photo %s to chat %d: %s\n", msg.Post.Photo, msg.ChatId, err.Error())
+			}
+		}
+	} else {
+		// Send the post
+		fb.sendFeedUpdateText(msg)
+	}
+}
+
+// Sends a message with a feed's post without photos/images
+func (fb *FeedBot) sendFeedUpdateText(msg *feeds.UpdateMessage) {
 	_, err := fb.manager.SendMessage(&pb.OutMessage{
 		Recipient: strconv.FormatInt(int64(msg.ChatId), 10),
 		Content: &pb.OutMessage_Text{
@@ -117,29 +153,6 @@ func (fb *FeedBot) sendFeedUpdate(msg *feeds.UpdateMessage) {
 	if err != nil {
 		fb.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())
 		return
-	}
-
-	// Send photo, if any
-	// Note that this might fail, for example if the image is too big (>5MB)
-	if msg.Post.Photo != "" {
-		_, err = fb.manager.SendMessage(&pb.OutMessage{
-			Recipient: strconv.FormatInt(int64(msg.ChatId), 10),
-			Content: &pb.OutMessage_Photo{
-				Photo: &pb.OutPhotoMessage{
-					File: &pb.OutFileMessage{
-						Location: &pb.OutFileMessage_Url{
-							Url: msg.Post.Photo,
-						},
-					},
-				},
-			},
-			// Do not send notifications for subsequent messages
-			DisableNotification: true,
-		})
-		if err != nil {
-			// Just log the error and continue
-			fb.log.Printf("Error sending photo %s to chat %d: %s\n", msg.Post.Photo, msg.ChatId, err.Error())
-		}
 	}
 }
 
