@@ -4,7 +4,7 @@ import "google/protobuf/timestamp.proto";
 
 package bot;
 
-option go_package = "github.com/ItalyPaleAle/rss-bot/proto";
+option go_package = "github.com/ItalyPaleAle/rss-bot/service";
 
 // InMessage is the model for received messages
 message InMessage {

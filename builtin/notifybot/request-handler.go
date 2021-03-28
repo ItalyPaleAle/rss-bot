@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 // Maximum request body size is 4 KB

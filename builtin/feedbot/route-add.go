@@ -4,7 +4,7 @@ import (
 	"regexp"
 
 	"github.com/ItalyPaleAle/rss-bot/feeds"
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 var routeAddMatch = regexp.MustCompile("(?i)^add feed (.*)")

@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 var routeRemoveMatch = regexp.MustCompile("(?i)^(remove|delete) webhook ([\\S]+)")

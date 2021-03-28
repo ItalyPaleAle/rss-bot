@@ -12,7 +12,7 @@ import (
 
 	"github.com/ItalyPaleAle/rss-bot/bot"
 	"github.com/ItalyPaleAle/rss-bot/feeds"
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 	"github.com/ItalyPaleAle/rss-bot/utils"
 )
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 // Route for the "list webhook(s)" command

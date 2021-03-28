@@ -3,7 +3,7 @@ package feedbot
 import (
 	"fmt"
 
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 // Route for the "list feed(s)" command

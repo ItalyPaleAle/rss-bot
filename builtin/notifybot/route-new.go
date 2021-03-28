@@ -8,7 +8,7 @@ import (
 	nanoid "github.com/matoous/go-nanoid/v2"
 
 	"github.com/ItalyPaleAle/rss-bot/db"
-	pb "github.com/ItalyPaleAle/rss-bot/proto"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 // Maximum number of webhooks per each chat
