@@ -42,10 +42,16 @@ message OutMessage {
     OutPhotoMessage photo = 12;
   }
 
+  // Options
+  OutMessageOptions options = 20;
+}
+
+// OutMessageOptions contains the options for sent messages
+message OutMessageOptions {
   // Option: disable notifications
-  bool disable_notification = 21;
+  bool disable_notification = 1;
   // Option: disable web page preview
-  bool disable_web_page_preview = 22;
+  bool disable_web_page_preview = 2;
 }
 
 // OutTextMessage is the model for text messages that need to be sent

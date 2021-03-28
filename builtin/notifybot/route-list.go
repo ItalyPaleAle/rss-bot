@@ -45,7 +45,9 @@ func (nb *NotifyBot) routeList(m *pb.InMessage) {
 				ParseMode: pb.ParseMode_HTML,
 			},
 		},
-		DisableWebPagePreview: true,
+		Options: &pb.OutMessageOptions{
+			DisableWebPagePreview: true,
+		},
 	})
 	if err != nil {
 		// Log errors only

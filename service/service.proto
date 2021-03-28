@@ -91,8 +91,8 @@ message EditTextMessageRequest {
   // Content
   OutTextMessage text = 10;
 
-  // Option: disable web page preview
-  bool disable_web_page_preview = 22;
+  // Options
+  OutMessageOptions options = 20;
 }
 
 // EditTextMessageResponse is the response object for the EditTextMessage action

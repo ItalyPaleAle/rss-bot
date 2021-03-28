@@ -119,7 +119,9 @@ func (fb *FeedBot) sendFeedUpdate(msg *feeds.UpdateMessage) {
 					CaptionParseMode: pb.ParseMode_HTML,
 				},
 			},
-			DisableWebPagePreview: true,
+			Options: &pb.OutMessageOptions{
+				DisableWebPagePreview: true,
+			},
 		})
 		if err != nil {
 			// If this failed with error "wrong file identifier/HTTP URL specified", it means that the photo filed to send, for example because it was > 5MB
@@ -148,7 +150,9 @@ func (fb *FeedBot) sendFeedUpdateText(msg *feeds.UpdateMessage) {
 				ParseMode: pb.ParseMode_HTML,
 			},
 		},
-		DisableWebPagePreview: true,
+		Options: &pb.OutMessageOptions{
+			DisableWebPagePreview: true,
+		},
 	})
 	if err != nil {
 		fb.log.Printf("Error sending message to chat %d: %s\n", msg.ChatId, err.Error())

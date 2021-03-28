@@ -30,12 +30,9 @@ func (fb *FeedBot) routeAdd(m *pb.InMessage) {
 	post, err := fb.feeds.AddSubscription(url, m.ChatId)
 	if err != nil {
 		if err == feeds.ErrAlreadySubscribed {
-			err := fb.manager.EditTextMessage(&pb.EditTextMessage{
-				Message: sent,
-				Text: &pb.OutTextMessage{
-					Text: "You've already subscribed this chat to the feed",
-				},
-			})
+			err := fb.manager.EditTextMessage(sent, &pb.OutTextMessage{
+				Text: "You've already subscribed this chat to the feed",
+			}, nil)
 			if err != nil {
 				// Log errors only
 				fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
@@ -44,12 +41,9 @@ func (fb *FeedBot) routeAdd(m *pb.InMessage) {
 			// Log errors and then send a message
 			fb.log.Printf("Error while adding feed to chat %d: %s\n", m.ChatId, err.Error())
 
-			err := fb.manager.EditTextMessage(&pb.EditTextMessage{
-				Message: sent,
-				Text: &pb.OutTextMessage{
-					Text: "An internal error occurred",
-				},
-			})
+			err := fb.manager.EditTextMessage(sent, &pb.OutTextMessage{
+				Text: "An internal error occurred",
+			}, nil)
 			if err != nil {
 				// Log errors only
 				fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
@@ -58,12 +52,9 @@ func (fb *FeedBot) routeAdd(m *pb.InMessage) {
 		return
 	}
 
-	err = fb.manager.EditTextMessage(&pb.EditTextMessage{
-		Message: sent,
-		Text: &pb.OutTextMessage{
-			Text: "I've added the feed to this channel. Here is the last post they published:",
-		},
-	})
+	err = fb.manager.EditTextMessage(sent, &pb.OutTextMessage{
+		Text: "I've added the feed to this channel. Here is the last post they published:",
+	}, nil)
 	if err != nil {
 		fb.log.Printf("Error sending message to chat %d: %s\n", m.ChatId, err.Error())
 		return

@@ -76,7 +76,9 @@ func (fb *FeedBot) routeRemove(m *pb.InMessage) {
 				Text: "Ok, I've removed the subscription to " + feeds[feedIdx].Url,
 			},
 		},
-		DisableWebPagePreview: true,
+		Options: &pb.OutMessageOptions{
+			DisableWebPagePreview: true,
+		},
 	})
 	if err != nil {
 		// Log errors only

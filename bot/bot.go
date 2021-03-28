@@ -99,11 +99,13 @@ func (b *BotManager) SendMessage(msg *pb.OutMessage) (*pb.SentMessage, error) {
 
 	// Send options
 	opts := &tb.SendOptions{}
-	if msg.DisableNotification {
-		opts.DisableNotification = true
-	}
-	if msg.DisableWebPagePreview {
-		opts.DisableWebPagePreview = true
+	if msg.Options != nil {
+		if msg.Options.DisableNotification {
+			opts.DisableNotification = true
+		}
+		if msg.Options.DisableWebPagePreview {
+			opts.DisableWebPagePreview = true
+		}
 	}
 
 	// Check if we're replying to a message
@@ -236,33 +238,33 @@ func (b *BotManager) SendMessage(msg *pb.OutMessage) (*pb.SentMessage, error) {
 }
 
 // EditTextMessage requests an edit to a text message that was sent before
-func (b *BotManager) EditTextMessage(edit *pb.EditTextMessage) error {
+func (b *BotManager) EditTextMessage(sentMsg *pb.SentMessage, edit *pb.OutTextMessage, opts *pb.OutMessageOptions) error {
 	// Message signature
 	msg := msgEditable{
-		MessageId: strconv.FormatInt(edit.Message.MessageId, 10),
-		ChatId:    edit.Message.ChatId,
+		MessageId: strconv.FormatInt(sentMsg.MessageId, 10),
+		ChatId:    sentMsg.ChatId,
 	}
 
 	// Send options
-	opts := &tb.SendOptions{}
-	if edit.DisableWebPagePreview {
-		opts.DisableWebPagePreview = true
+	tbOpts := &tb.SendOptions{}
+	if opts != nil && opts.DisableWebPagePreview {
+		tbOpts.DisableWebPagePreview = true
 	}
 
 	// Content
-	if edit.Text == nil || edit.Text.Text == "" {
+	if edit.Text == "" {
 		return errors.New("Message's text content is empty")
 	}
-	content := edit.Text.Text
+	content := edit.Text
 
 	// Set parse mode, if needed
-	switch edit.Text.ParseMode {
+	switch edit.ParseMode {
 	case pb.ParseMode_HTML:
-		opts.ParseMode = tb.ModeHTML
+		tbOpts.ParseMode = tb.ModeHTML
 	case pb.ParseMode_MARKDOWN:
-		opts.ParseMode = tb.ModeMarkdown
+		tbOpts.ParseMode = tb.ModeMarkdown
 	case pb.ParseMode_MARKDOWN_V2:
-		opts.ParseMode = tb.ModeMarkdownV2
+		tbOpts.ParseMode = tb.ModeMarkdownV2
 	}
 
 	// Request the edit
