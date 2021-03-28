@@ -103,6 +103,16 @@ func (nb *NotifyBot) requestHandler() http.Handler {
 			return
 		}
 
+		// Append the recipient ID to the message
+		switch parseMode {
+		case pb.ParseMode_HTML:
+			message += "\n<i>(" + recipientId + ")</i>"
+		case pb.ParseMode_MARKDOWN_V2:
+			message += "\n*(" + recipientId + ")*"
+		default:
+			message += "\n(" + recipientId + ")"
+		}
+
 		// Send the message in a background goroutine (so we're not pausing the response)
 		go func() {
 			_, err := nb.manager.SendMessage(&pb.OutMessage{
