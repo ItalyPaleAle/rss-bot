@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/viper"
 
@@ -10,6 +14,7 @@ import (
 	"github.com/ItalyPaleAle/rss-bot/builtin/notifybot"
 	"github.com/ItalyPaleAle/rss-bot/db"
 	"github.com/ItalyPaleAle/rss-bot/migrations"
+	"github.com/ItalyPaleAle/rss-bot/server"
 )
 
 func main() {
@@ -21,13 +26,19 @@ func main() {
 	// Load config
 	loadConfig()
 
+	// Execution context
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
+
 	// Connect to DB and migrate to the latest version
 	dbc := db.ConnectDB()
 	defer dbc.Close()
 	migrations.Migrate()
 
 	// Create the bot
-	b := &bot.BotManager{}
+	b := &bot.BotManager{
+		Ctx: ctx,
+	}
 	err := b.Init()
 	if err != nil {
 		panic(err)
@@ -59,11 +70,28 @@ func main() {
 		}
 	}
 
-	// Start the bot - this is a blocking call
-	err = b.Start()
-	if err != nil {
-		panic(err)
+	// Start the bot in a background goroutine
+	go b.Start()
+
+	// Start the gRPC server in a background goroutine
+	srv := &server.RPCServer{
+		Ctx: ctx,
 	}
+	srv.Init(b)
+	go srv.Start()
+
+	// Handle graceful shutdown on SIGINT, SIGTERM and SIGQUIT
+	stopSigCh := make(chan os.Signal, 1)
+	signal.Notify(stopSigCh,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+
+	// Wait for the shutdown signal then stop the bot and the server
+	<-stopSigCh
+	b.Stop()
+	srv.Stop()
 }
 
 func loadConfig() {

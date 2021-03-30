@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ItalyPaleAle/rss-bot/bot"
+	pb "github.com/ItalyPaleAle/rss-bot/service"
 )
 
 // TODO: Make env var
@@ -100,15 +101,27 @@ func (nb *NotifyBot) Stop() {
 
 // Register all routes
 func (nb *NotifyBot) registerRoutes() (err error) {
-	err = nb.manager.AddRoute("(?i)^(new|add) webhook", nb.routeNew)
+	err = nb.manager.AddRoute("notify", "(?i)^(new|add) webhook", func(m *pb.InMessage) error {
+		// Errors are already handled by the method
+		nb.routeNew(m)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	err = nb.manager.AddRoute("(?i)^list webhook(s?)", nb.routeList)
+	err = nb.manager.AddRoute("notify", "(?i)^list webhook(s?)", func(m *pb.InMessage) error {
+		// Errors are already handled by the method
+		nb.routeList(m)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	err = nb.manager.AddRoute("(?i)^(remove|delete) webhook", nb.routeRemove)
+	err = nb.manager.AddRoute("notify", "(?i)^(remove|delete) webhook", func(m *pb.InMessage) error {
+		// Errors are already handled by the method
+		nb.routeRemove(m)
+		return nil
+	})
 	if err != nil {
 		return err
 	}

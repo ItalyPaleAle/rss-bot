@@ -179,15 +179,27 @@ func (fb *FeedBot) formatUpdateMessage(msg *feeds.UpdateMessage) string {
 
 // Register all routes
 func (fb *FeedBot) registerRoutes() (err error) {
-	err = fb.manager.AddRoute("(?i)^add feed", fb.routeAdd)
+	err = fb.manager.AddRoute("feed", "(?i)^add feed", func(m *pb.InMessage) error {
+		// Errors are already handled by the method
+		fb.routeAdd(m)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	err = fb.manager.AddRoute("(?i)^list feed(s?)", fb.routeList)
+	err = fb.manager.AddRoute("feed", "(?i)^list feed(s?)", func(m *pb.InMessage) error {
+		// Errors are already handled by the method
+		fb.routeList(m)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	err = fb.manager.AddRoute("(?i)^(remove|delete) feed", fb.routeRemove)
+	err = fb.manager.AddRoute("feed", "(?i)^(remove|delete) feed", func(m *pb.InMessage) error {
+		// Errors are already handled by the method
+		fb.routeRemove(m)
+		return nil
+	})
 	if err != nil {
 		return err
 	}

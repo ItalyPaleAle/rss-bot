@@ -52,14 +52,8 @@ message SendMessageRequest {
 
 // SendMessageResponse is the response object for the SendMessage action
 message SendMessageResponse {
-  // OK if the message was sent without error
-  bool ok = 1;
-
-  // Error message if the message was not sent
-  string error = 2;
-
   // Message sent
-  SentMessage sent_message = 10;
+  SentMessage sent_message = 1;
 }
 
 // RespondToCommmandRequest is the request object for the RespondToCommand action
@@ -73,14 +67,8 @@ message RespondToCommandRequest {
 
 // RespondToCommandResponse is the response object for the RespondToCommand action
 message RespondToCommandResponse {
-  // OK if the message was sent without error
-  bool ok = 1;
-
-  // Error message if the message was not sent
-  string error = 2;
-
   // Message sent
-  SentMessage sent_message = 10;
+  SentMessage sent_message = 1;
 }
 
 // EditTextMessageRequest is the request object for the EditTextMessage action
@@ -97,9 +85,5 @@ message EditTextMessageRequest {
 
 // EditTextMessageResponse is the response object for the EditTextMessage action
 message EditTextMessageResponse {
-  // OK if the message was edited without error
-  bool ok = 1;
-
-  // Error message if the message was not edited
-  string error = 2;
+  // Currently empty
 }

@@ -21,9 +21,10 @@ import (
 
 // BotManager is the class that manages the bot
 type BotManager struct {
+	Ctx context.Context
+
 	log    *log.Logger
 	bot    *tb.Bot
-	ctx    context.Context
 	cancel context.CancelFunc
 	routes []routeDefinition
 }
@@ -32,6 +33,11 @@ type BotManager struct {
 func (b *BotManager) Init() (err error) {
 	// Init the logger
 	b.log = log.New(os.Stdout, "bot: ", log.Ldate|log.Ltime|log.LUTC)
+
+	// If there's no context, use the background one
+	if b.Ctx == nil {
+		b.Ctx = context.Background()
+	}
 
 	// Get the auth key
 	// "token" is the default value in the config file
@@ -68,20 +74,18 @@ func (b *BotManager) Init() (err error) {
 }
 
 // Start the background workers
-func (b *BotManager) Start() error {
-	// Context, that can be used to stop the bot
-	b.ctx, b.cancel = context.WithCancel(context.Background())
-
+func (b *BotManager) Start() {
 	// Start the bot
 	b.log.Println("Bot starting")
 	b.bot.Start()
 
-	return nil
+	return
 }
 
 // Stop the bot and the background processes
 func (b *BotManager) Stop() {
-	b.cancel()
+	b.log.Println("Bot stopping")
+	b.bot.Stop()
 }
 
 // SendMessage sends a message to a chat or user
@@ -268,7 +272,7 @@ func (b *BotManager) EditTextMessage(sentMsg *pb.SentMessage, edit *pb.OutTextMe
 	}
 
 	// Request the edit
-	_, err := b.bot.Edit(msg, content, opts)
+	_, err := b.bot.Edit(msg, content, tbOpts)
 	if err != nil {
 		return err
 	}
@@ -276,27 +280,44 @@ func (b *BotManager) EditTextMessage(sentMsg *pb.SentMessage, edit *pb.OutTextMe
 }
 
 // AddRoute adds a route for text messages
-func (b *BotManager) AddRoute(route string, cb RouteCallback) error {
+func (b *BotManager) AddRoute(provider string, route string, cb RouteCallback) error {
 	if len(route) < 1 {
-		return errors.New("Route is empty or invalid")
+		return errors.New("route is empty or invalid")
 	}
 	if cb == nil {
-		return errors.New("Callback is empty")
+		return errors.New("callback is empty")
 	}
 
 	// Create a regular expression from the route
 	exp, err := regexp.Compile(route)
 	if err != nil {
-		return fmt.Errorf("Could not compile route's regular expression: %s", err)
+		return fmt.Errorf("could not compile route's regular expression: %s", err)
 	}
 
 	// Add the route to the list
 	b.routes = append(b.routes, routeDefinition{
+		Provider: provider,
 		Path:     route,
 		Match:    exp,
 		Callback: cb,
 	})
 
+	return nil
+}
+
+// RemoveProvider removes all routes for a provider
+func (b *BotManager) RemoveProvider(provider string) error {
+	j := 0
+	for i, e := range b.routes {
+		if e.Provider != provider {
+			b.routes[j] = b.routes[i]
+			j++
+		}
+	}
+	if j == len(b.routes) {
+		return errors.New("no element removed")
+	}
+	b.routes = b.routes[:j]
 	return nil
 }
 
@@ -306,27 +327,29 @@ func (b *BotManager) addCoreRoutes() {
 		// Say hi!
 		{
 			Match: regexp.MustCompile("(?i)^(hi|hello|hey)([[:punct:]]|\\s)*(there|bot)?"),
-			Callback: func(mp *pb.InMessage) {
+			Callback: func(mp *pb.InMessage) error {
 				_, err := b.RespondToCommand(mp, "👋 Hey there! What can I do for you? ")
 				if err != nil {
 					// Log errors only
 					b.log.Printf("Error sending message to chat %d: %s\n", mp.ChatId, err.Error())
 				}
+				return err
 			},
 		},
 		// Add a route for help messages
 		{
 			Match: regexp.MustCompile("(?i)^help"),
-			Callback: func(m *pb.InMessage) {
-				b.helpMessageCallback(m)
+			Callback: func(m *pb.InMessage) error {
+				return b.helpMessageCallback(m)
 			},
 		},
 	}
 }
 
 // Sends the help message
-func (b *BotManager) helpMessageCallback(m *pb.InMessage) {
-	b.RespondToCommand(m, "Here's where I'll write the help message 🤔")
+func (b *BotManager) helpMessageCallback(m *pb.InMessage) error {
+	_, err := b.RespondToCommand(m, "Here's where I'll write the help message 🤔")
+	return err
 }
 
 // Finds a route matching the message, if any
@@ -432,7 +455,11 @@ func (b *BotManager) handleMessages() {
 		// Look for a matching route
 		cb := b.matchRoute(m)
 		if cb != nil {
-			cb(mp)
+			err := cb(mp)
+			if err != nil {
+				// Log errors only
+				b.log.Printf("Callback processing message for chat %d returned an error: %s\n", mp.ChatId, err.Error())
+			}
 			return
 		}
 
@@ -566,10 +593,11 @@ func messageToProto(m *tb.Message) *pb.InMessage {
 }
 
 // RouteCallback is the callback function for a given route
-type RouteCallback func(m *pb.InMessage)
+type RouteCallback func(m *pb.InMessage) error
 
 // Internal struct used to maintain a route definition
 type routeDefinition struct {
+	Provider string
 	Path     string
 	Match    *regexp.Regexp
 	Callback RouteCallback
