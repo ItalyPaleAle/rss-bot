@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/Songmu/go-httpdate v1.0.0
 	github.com/golang/protobuf v1.5.1
+	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
 	github.com/jmoiron/sqlx v1.3.1
 	github.com/matoous/go-nanoid/v2 v2.0.0
 	github.com/mattn/go-sqlite3 v1.14.6

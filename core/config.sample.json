@@ -1,0 +1,7 @@
+{
+  "TelegramAuthToken": "token",
+  "TelegramAPIDebug": false,
+  "DBPath": "./bot.db",
+  "FeedUpdateInterval": 600,
+  "AllowedUsers": []
+}

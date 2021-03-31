@@ -1,0 +1,7 @@
+.git
+.gitignore
+.github
+.vscode
+Dockerfile
+config.json
+config.sample.json

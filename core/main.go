@@ -9,11 +9,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ItalyPaleAle/rss-bot/builtin/feedbot"
-	"github.com/ItalyPaleAle/rss-bot/builtin/notifybot"
 	"github.com/ItalyPaleAle/rss-bot/core/bot"
-	"github.com/ItalyPaleAle/rss-bot/core/db"
-	"github.com/ItalyPaleAle/rss-bot/core/migrations"
 	"github.com/ItalyPaleAle/rss-bot/core/server"
 )
 
@@ -30,11 +26,6 @@ func main() {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	defer ctxCancel()
 
-	// Connect to DB and migrate to the latest version
-	dbc := db.ConnectDB()
-	defer dbc.Close()
-	migrations.Migrate()
-
 	// Create the bot
 	b := &bot.BotManager{
 		Ctx: ctx,
@@ -42,32 +33,6 @@ func main() {
 	err := b.Init()
 	if err != nil {
 		panic(err)
-	}
-
-	// Add built-in features
-	{
-		// FeedBot: RSS and Atom feeds
-		feature := &feedbot.FeedBot{}
-		err := feature.Init(b)
-		if err != nil {
-			panic(err)
-		}
-		err = feature.Start()
-		if err != nil {
-			panic(err)
-		}
-	}
-	{
-		// NotifyBot: Webhook notifier
-		feature := &notifybot.NotifyBot{}
-		err := feature.Init(b)
-		if err != nil {
-			panic(err)
-		}
-		err = feature.Start()
-		if err != nil {
-			panic(err)
-		}
 	}
 
 	// Start the bot in a background goroutine
@@ -99,8 +64,6 @@ func loadConfig() {
 	viper.SetDefault("TelegramAuthToken", "")
 	viper.SetDefault("TelegramAPIDebug", false)
 	viper.SetDefault("AllowedUsers", nil)
-	viper.SetDefault("DBPath", "./bot.db")
-	viper.SetDefault("FeedUpdateInterval", 600)
 
 	// Env
 	viper.SetEnvPrefix("BOT")
