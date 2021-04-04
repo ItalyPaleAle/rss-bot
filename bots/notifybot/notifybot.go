@@ -52,13 +52,13 @@ func (nb *NotifyBot) Init() error {
 	return nil
 }
 
-// Start the web server
+// Start the bot and the web server
 func (nb *NotifyBot) Start() error {
 	// Context, that can be used to stop the web server (and the bot)
 	nb.ctx, nb.cancel = context.WithCancel(context.Background())
 
-	// Connect to the bot
-	err := nb.client.Connect()
+	// Start the bot
+	err := nb.client.Start()
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (nb *NotifyBot) Start() error {
 
 	// Start the server in a separate goroutine so we don't block the main thread
 	go func() {
-		nb.log.Println("Starting the web server on, listening on", listen)
+		nb.log.Println("Starting the web server, listening on", listen)
 		// This call blocks until the server is shut down
 		err = srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -106,10 +106,10 @@ func (nb *NotifyBot) Start() error {
 	return nil
 }
 
-// Stop the background processes
+// Stop the bot and the web server
 func (nb *NotifyBot) Stop() error {
 	nb.cancel()
-	err := nb.client.Disconnect()
+	err := nb.client.Stop()
 	if err != nil {
 		return err
 	}

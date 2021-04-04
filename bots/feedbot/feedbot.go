@@ -46,13 +46,13 @@ func (fb *FeedBot) Init() error {
 	return nil
 }
 
-// Start the background workers
+// Start the bot and the background workers
 func (fb *FeedBot) Start() error {
 	// Context, that can be used to stop the bot
 	fb.ctx, fb.cancel = context.WithCancel(context.Background())
 
-	// Connect to the bot
-	err := fb.client.Connect()
+	// Start the bot
+	err := fb.client.Start()
 	if err != nil {
 		return err
 	}
@@ -73,10 +73,10 @@ func (fb *FeedBot) Start() error {
 	return nil
 }
 
-// Stop the background processes
+// Stop the bot and the background processes
 func (fb *FeedBot) Stop() error {
 	fb.cancel()
-	err := fb.client.Disconnect()
+	err := fb.client.Stop()
 	if err != nil {
 		return err
 	}

@@ -26,7 +26,7 @@ const authToken = "hello world"
 const requestTimeout = 15
 
 // Interval between keepalive requests, in seconds
-const keepaliveInterval = 600
+const keepaliveInterval = 120
 
 // RPCAuth is the object implementing credentials.PerRPCCredentials that provides the auth info
 type RPCAuth struct {
@@ -75,8 +75,13 @@ func (c *BotClient) Init(name string, displayName string, helpText string) error
 	return nil
 }
 
-// Connect starts the connection to the gRPC server and starts all background streams
-func (c *BotClient) Connect() (err error) {
+// Start the bot and establish a connection with the bot server, then registers the bot
+func (c *BotClient) Start() (err error) {
+	return c.connect()
+}
+
+// starts the connection to the gRPC server and registers the bot
+func (c *BotClient) connect() (err error) {
 	// Underlying connection
 	connOpts := []grpc.DialOption{
 		grpc.WithBlock(),
@@ -108,7 +113,7 @@ func (c *BotClient) Connect() (err error) {
 
 	// In another goroutine, make the request to register the action with the bot server, which also creates a stream
 	go func() {
-		// Continue re-connecting automatically if the connection drops
+		// Continue re-connecting automatically if the connection drops, for as long ast the underlying connection is active
 		for c.connection != nil {
 			c.logger.Println("Registering the bot")
 			// Note that if the underlying connection is down, this call blocks until it comes back
@@ -121,21 +126,21 @@ func (c *BotClient) Connect() (err error) {
 	return nil
 }
 
-// Disconnect closes the connection with the gRPC server
-func (c *BotClient) Disconnect() error {
+// Stop closes the connection with the gRPC server
+func (c *BotClient) Stop() error {
 	conn := c.connection
 	c.connection = nil
 	err := conn.Close()
 	return err
 }
 
-// Reconnect re-connects to the gRPC server
-func (c *BotClient) Reconnect() error {
+// Restart re-connects to the gRPC server
+func (c *BotClient) Restart() error {
 	if c.connection != nil {
 		// Ignore errors here
-		_ = c.Disconnect()
+		_ = c.Stop()
 	}
-	return c.Connect()
+	return c.Start()
 }
 
 // startConnection starts the stream with the server
@@ -213,7 +218,7 @@ func (c *BotClient) startConnection() {
 }
 
 // AddRoute adds a route for text messages
-// Note that this must be called before invoking the Connect method
+// Note that this must be called before invoking the Start method
 func (c *BotClient) AddRoute(path string, cb pb.RouteCallback) error {
 	if len(path) < 1 {
 		return errors.New("route is empty or invalid")
