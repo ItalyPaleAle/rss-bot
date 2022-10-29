@@ -270,9 +270,9 @@ func (b *RSSBot) registerCommands() (err error) {
 
 // Returns the list of allowed users (if any)
 // Returns a map so lookups are faster
-func (b *RSSBot) getAllowedUsers() (allowedUsers map[int]bool) {
+func (b *RSSBot) getAllowedUsers() (allowedUsers map[int64]bool) {
 	// Check if we can get an int slice
-	uids := viper.GetIntSlice("AllowedUsers")
+	uids := viper.GetStringSlice("AllowedUsers")
 	if len(uids) == 0 {
 		// Check if we can get a string
 		str := viper.GetString("AllowedUsers")
@@ -280,22 +280,26 @@ func (b *RSSBot) getAllowedUsers() (allowedUsers map[int]bool) {
 			// Split on commas
 			for _, s := range strings.Split(str, ",") {
 				// Ignore invalid ones
-				num, err := strconv.Atoi(s)
+				num, err := strconv.ParseInt(s, 10, 64)
 				if err != nil || num < 1 {
 					continue
 				}
 				// Add to the map
 				if allowedUsers == nil {
-					allowedUsers = make(map[int]bool)
+					allowedUsers = make(map[int64]bool)
 				}
 				allowedUsers[num] = true
 			}
 		}
 	} else {
 		// Convert to a map
-		allowedUsers = make(map[int]bool, len(uids))
+		allowedUsers = make(map[int64]bool, len(uids))
 		for i := 0; i < len(uids); i++ {
-			allowedUsers[uids[i]] = true
+			num, err := strconv.ParseInt(uids[i], 10, 64)
+			if err != nil || num < 1 {
+				continue
+			}
+			allowedUsers[num] = true
 		}
 	}
 	return
