@@ -66,10 +66,7 @@ When set, environmental variables take precedence over settings from config file
 
 The best way to run this bot is as a Docker container.
 
-The container image is published to both Docker Hub and GitHub Container Registry:
-
-- Docker Hub: `italypaleale/rss-bot`
-- GitHub Container Registry: `ghcr.io/italypaleale/rss-bot`
+The container image is published to GitHub Container Registry: `ghcr.io/italypaleale/rss-bot`
 
 To run with Docker:
 
@@ -81,7 +78,7 @@ docker run \
   --name rss-bot \
   -v rssdb:/data \
   -e BOT_TELEGRAMAUTHTOKEN=xxx \
-  italypaleale/rss-bot:latest
+  ghcr.io/italypaleale/rss-bot:latest
 ```
 
 Note the Docker volume `rssdb` mounted to `/data`, which will contain the SQLite database. Optionally, you can mount that to a local folder too.

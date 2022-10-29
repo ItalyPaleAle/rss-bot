@@ -11,12 +11,6 @@ jobs:
     name: Build rss-bot
     runs-on: ubuntu-22.04
     steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1 
         with:
@@ -41,7 +35,6 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: |
-            italypaleale/rss-bot:latest
             ghcr.io/italypaleale/rss-bot:latest
           push: true
 
